@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- Local fixture for flow-engine and recorder tests. -->
+<html><head><meta charset="utf-8"><title>Fixture form</title><style>.hidden{display:none}</style></head>
+<body>
+<h1>Fixture form</h1>
+<label for="name">Your name</label> <input id="name" type="text">
+<input name="pw" type="password" placeholder="Password">
+<textarea aria-label="Caption" id="cap"></textarea>
+<button data-testid="save-btn" id="save">Save</button>
+<button aria-label="Settings gear" id="gear">⚙</button>
+<div role="button" id="go" tabindex="0">Continue</div>
+<span id="plain" style="cursor:pointer">Plain text item</span>
+<input type="file" id="file" multiple style="display:none">
+<button id="pickBtn">Pick files</button>
+<div id="files"></div>
+<div id="result" class="hidden">Saved for <b id="who"></b></div>
+<a href="page2.html" id="next">Next page</a>
+<script>
+  const $ = (id) => document.getElementById(id);
+  window.__clicks = [];
+  $('save').onclick = () => { $('who').innerText = $('name').value; setTimeout(() => $('result').classList.remove('hidden'), 400); };
+  $('gear').onclick = () => window.__clicks.push('gear');
+  $('go').onclick = () => window.__clicks.push('go');
+  $('plain').onclick = () => window.__clicks.push('plain');
+  $('pickBtn').onclick = () => $('file').click();
+  $('file').onchange = () => { $('files').innerText = Array.from($('file').files).map((f) => f.name).join(','); };
+</script>
+</body></html>

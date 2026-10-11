@@ -4,6 +4,7 @@
 import { safeStorage } from 'electron'
 import { db } from '../../core/db'
 import { UserError } from '../../core/errors'
+import { normalizeTotpSecret } from './totp'
 
 export interface AccountSecret {
   username: string | null
@@ -50,7 +51,7 @@ export function writeAccountSecret(accountId: string, patch: Partial<AccountSecr
   for (const k of ['username', 'password', 'totpSecret'] as const) {
     if (patch[k] === undefined) continue
     const v = patch[k]
-    next[k] = v == null || v === '' ? null : k === 'totpSecret' ? v.replace(/\s+/g, '').toUpperCase() : v
+    next[k] = v == null || v === '' ? null : k === 'totpSecret' ? normalizeTotpSecret(v) : v
   }
   const empty = !next.username && !next.password && !next.totpSecret
   db.run(

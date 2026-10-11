@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- Mimics the STRUCTURE the TikTok recipe expects (not TikTok's markup). Test fixture only. -->
+<html><head><meta charset="utf-8"><title>TikTok Studio</title>
+<style> .hidden { display: none; } #sugg { border: 1px solid #333; background: #fff; } </style></head>
+<body>
+<h1>Upload</h1>
+<div id="pickArea"><p>Select video to upload</p><button id="selectBtn">Select video</button>
+  <input type="file" accept="video/*" id="file" style="display:none"></div>
+<div id="editor" class="hidden">
+  <div data-e2e="caption"><div class="public-DraftEditor-content" contenteditable="true" role="combobox" id="desc" style="min-height:60px;border:1px solid #ccc"></div></div>
+  <div id="sugg" class="hidden">#sunsetvibes</div>
+  <div data-e2e="video_visibility_container"><div role="combobox" id="vis" tabindex="0">Everyone</div>
+    <div id="visMenu" class="hidden"><div role="option">Everyone</div><div role="option">Friends</div><div role="option" id="onlyYou">Only you</div></div></div>
+  <label><input type="checkbox" checked id="cmt">Comment</label>
+  <button data-e2e="post_video_button" id="post" disabled>Post</button>
+</div>
+<div id="done" class="hidden">Your video has been uploaded</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  window.__desc = null; window.__suggestionAteEnter = false;
+  $('selectBtn').onclick = () => $('file').click();
+  $('file').onchange = () => {
+    const name = $('file').files[0].name.replace(/\.[^.]+$/, '');
+    $('pickArea').classList.add('hidden'); $('editor').classList.remove('hidden');
+    $('desc').innerText = name;           // the trap: pre-filled with the file name
+    setTimeout(() => { $('post').disabled = false; }, 800); // the "upload" finishes
+  };
+  // hashtag suggestion list: open while the text ends in #word; Enter then picks the suggestion
+  $('desc').addEventListener('input', () => { $('sugg').classList.toggle('hidden', !/#\w+$/.test($('desc').innerText.replace(/\n+$/, ''))); });
+  $('desc').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !$('sugg').classList.contains('hidden')) { e.preventDefault(); window.__suggestionAteEnter = true; $('sugg').classList.add('hidden'); }
+  });
+  $('vis').onclick = () => $('visMenu').classList.remove('hidden');
+  document.querySelectorAll('#visMenu [role=option]').forEach((o) => o.onclick = () => { $('vis').innerText = o.innerText; $('visMenu').classList.add('hidden'); });
+  $('post').onclick = () => { window.__desc = $('desc').innerText; window.__vis = $('vis').innerText; window.__comment = $('cmt').checked; setTimeout(() => $('done').classList.remove('hidden'), 300); };
+</script>
+</body></html>

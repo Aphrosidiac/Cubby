@@ -1,5 +1,3 @@
-// OWNER: automation module builder. PUBLIC interface — keep exports; replace stubs.
-//
 // The run manager (PLAN §18 "Runs"): every recipe, flow and long Claude action executes as a run.
 //  - one run per brand at a time; further runs for that brand wait in a FIFO queue
 //  - each run gets an AbortController; runtime onKill() aborts all; runs.abort aborts one
@@ -10,61 +8,30 @@
 //    detectCheckpoint() from @shared/checkpoints; on a hit: status needs_human, frontBrand(), notify(),
 //    logActivity('guardrail.checkpoint'), throw GuardrailError(rule 'checkpoint'). Never solve it.
 //  - rt.page() is activePage(brandId); rt.guardUrl(url) throws GuardrailError('off_limits') when
-//    isOffLimits(url) and the actor is claude
-import type { Page } from 'playwright-core'
-import type { Actor, FlowRun, LiveRun } from '@shared/types'
-import { UserError } from '../../core/errors'
+//    isOffLimits(url) and the actor is claude or flow
+// The logic lives in ./manager (electron-free, unit-tested); this file wires the browser module and
+// OS notifications into it and owns the module lifecycle.
+import { notify } from '../../core/notify'
+import { onKill } from '../../core/runtime'
+import { activePage, frontBrand } from '../browser'
+import { abortAll, drain, failStaleRuns, flushAll, setRunDeps } from './manager'
 
-export interface RunOptions {
-  brandId: string
-  actor: Actor
-  label: string
-  flowId?: string | null
-  recipe?: string | null
-  postId?: string | null
-  /** external abort (e.g. MCP request cancelled) */
-  signal?: AbortSignal
+export type { RunContext, RunOptions, Enqueued } from './manager'
+export { startRun, enqueueRun, liveRuns, brandBusy, abortRun, abortAll, getRun, listRuns, pageFacts } from './manager'
+
+setRunDeps({ activePage, frontBrand, notify })
+
+let offKill: (() => void) | null = null
+
+export function start(): void {
+  const n = failStaleRuns()
+  if (n) console.log(`[runs] marked ${n} interrupted run(s) as failed`)
+  offKill = onKill(() => abortAll('Stopped — kill switch'))
 }
 
-export interface RunContext {
-  runId: string
-  brandId: string
-  actor: Actor
-  signal: AbortSignal
-  page(): Promise<Page>
-  log(msg: string, level?: 'info' | 'warn' | 'error'): void
-  step<T>(name: string, fn: () => Promise<T>): Promise<T>
-  /** saves a PNG of the active page under paths.screens; returns the absolute path */
-  screenshot(label?: string): Promise<string>
-  /** throws GuardrailError if the page shows a checkpoint / captcha / rate-limit wall */
-  checkpoint(): Promise<void>
-  guardUrl(url: string): void
-  /** throws if aborted */
-  throwIfAborted(): void
+export async function stop(): Promise<void> {
+  offKill?.()
+  abortAll('Cubby is quitting')
+  await drain(5000)
+  flushAll()
 }
-
-/** Queue + execute a run. Resolves with the final run record and the body's result (if it succeeded). */
-export async function startRun<T>(opts: RunOptions, body: (rt: RunContext) => Promise<T>): Promise<{ run: FlowRun; result?: T; error?: unknown }> {
-  void body
-  throw new UserError(`run manager not built (${opts.label})`, 'not_implemented')
-}
-
-export function liveRuns(): LiveRun[] {
-  return []
-}
-
-/** The live run currently holding this brand, if any (Claude's browser tools refuse while one runs). */
-export function brandBusy(brandId: string): LiveRun | null {
-  void brandId
-  return null
-}
-
-export function abortRun(runId: string): boolean {
-  void runId
-  return false
-}
-
-export function abortAll(): void {}
-
-export function start(): void {}
-export async function stop(): Promise<void> {}

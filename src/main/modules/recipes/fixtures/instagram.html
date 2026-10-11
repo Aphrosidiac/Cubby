@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- Mimics the STRUCTURE the Instagram recipe expects (not Instagram's markup). Test fixture only. -->
+<html><head><meta charset="utf-8"><title>Instagram</title>
+<style>
+  body { margin: 0; font: 14px sans-serif; }
+  #rail { position: fixed; left: 0; top: 0; width: 220px; padding: 8px; }
+  #rail a { display: block; padding: 6px; }
+  #feed { margin-left: 400px; }
+  [role=dialog] { position: fixed; inset: 40px 300px; background: #fff; border: 1px solid #999; padding: 12px; }
+  .hidden { display: none; }
+  [role=button] { display: inline-block; padding: 4px 8px; border: 1px solid #333; cursor: pointer; }
+</style></head>
+<body>
+<div id="rail">
+  <a href="/" role="link">Home</a>
+  <a href="#" id="create" role="link">Create</a>
+  <div id="createMenu" class="hidden"><a href="#" id="menuPost" role="link">Post</a><a href="#" role="link">Live video</a></div>
+  <a href="/__HANDLE__/" role="link"><img alt="__HANDLE__'s profile picture" width="20" height="20"><span>Profile</span></a>
+</div>
+<div id="feed">
+  <article><a href="/someoneelse/"><img alt="someoneelse's profile picture" width="30" height="30"></a> someoneelse · Sunset tonight</article>
+  <article><a href="/another.one/"><img alt="another.one's profile picture" width="30" height="30"></a> another.one · Lunch</article>
+</div>
+
+<div role="dialog" id="dlg" class="hidden" aria-label="Create new post">
+  <div id="stepPick"><h2>Create new post</h2><p>Drag photos and videos here</p>
+    <button id="pick">Select from computer</button>
+    <form enctype="multipart/form-data"><input type="file" id="file" accept="image/*,video/*" multiple style="display:none"></form>
+  </div>
+  <div id="stepCrop" class="hidden"><h2>Crop</h2>
+    <div role="button" aria-label="Select crop" id="cropBtn">crop</div>
+    <div id="cropMenu" class="hidden"><div role="button" id="cropOriginal">Original</div><div role="button">1:1</div><div role="button">4:5</div></div>
+    <div role="button" class="next">Next</div></div>
+  <div id="stepEdit" class="hidden"><h2>Edit</h2><div role="button" class="next">Next</div></div>
+  <div id="stepCaption" class="hidden"><h2>Create new post</h2>
+    <div><img alt="__HANDLE__'s profile picture" width="20" height="20"> __HANDLE__</div>
+    <div contenteditable="true" role="textbox" aria-label="Write a caption..." id="caption" style="min-height:60px;border:1px solid #ccc"></div>
+    <div role="button" id="share">Share</div></div>
+  <div id="stepDone" class="hidden"><h2>Post shared</h2><p>Your post has been shared.</p></div>
+</div>
+<div id="discard" class="hidden" role="alertdialog">Discard post? If you leave, your edits will not be saved.</div>
+<script>
+  window.__escapePressed = false; window.__crop = null; window.__files = []; window.__caption = null;
+  const $ = (id) => document.getElementById(id);
+  const show = (id) => { for (const s of ['stepPick','stepCrop','stepEdit','stepCaption','stepDone']) $(s).classList.toggle('hidden', s !== id); };
+  $('create').onclick = (e) => { e.preventDefault(); $('createMenu').classList.remove('hidden'); };
+  $('menuPost').onclick = (e) => { e.preventDefault(); $('dlg').classList.remove('hidden'); show('stepPick'); };
+  $('pick').onclick = () => $('file').click();
+  $('file').onchange = () => { window.__files = Array.from($('file').files).map(f => f.name); show('stepCrop'); };
+  $('cropBtn').onclick = () => $('cropMenu').classList.remove('hidden');
+  $('cropOriginal').onclick = () => { window.__crop = 'original'; $('cropMenu').classList.add('hidden'); };
+  document.querySelectorAll('.next').forEach((b) => b.onclick = () => { if (!$('stepCrop').classList.contains('hidden')) show('stepEdit'); else show('stepCaption'); });
+  $('share').onclick = () => { window.__caption = $('caption').innerText; setTimeout(() => show('stepDone'), 400); };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('dlg').classList.contains('hidden')) { window.__escapePressed = true; $('discard').classList.remove('hidden'); } });
+</script>
+</body></html>

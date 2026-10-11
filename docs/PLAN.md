@@ -355,19 +355,19 @@ brand at a time. Machine asleep/off → missed posts run on wake, re-paced (or s
 ---
 
 ## 13. Repo layout
-```
-apps/desktop/
-  src/main/       core (brands, launcher, cdp, guardrails, pacing, recipes, flows, scheduler,
-                  health, media, backup, secrets), Local API + MCP, tray, IPC handlers
-  src/preload/    typed bridge
-  src/renderer/   Vue app (pages per §6, components/ui from FF Ops)
-  resources/      icons, ffmpeg/ffprobe binaries
-packages/recipes/ platform recipes + checkpoint detectors (+ saved HTML fixtures for tests)
-packages/shared/  types, zod schemas, platform specs, pacing defaults
-docs/
-```
 
----
+One package (simplest and most reliable with electron-builder; pnpm with `node-linker=hoisted`):
+```
+src/shared/      contract.ts (every command + events), types, platforms (specs, fit targets, pacing
+                 defaults, off-limits pages), checkpoints, pacing, csv — pure TS, unit-tested
+src/main/        core/ (db, migrations, registry, events, activity, settings, runtime, crypto, notify)
+                 modules/<name>/ (brands, browser, accounts, health, media, pacing, runs, recipes,
+                 flows, posts, tools, tokens, mcp, api, backup, scheduler, app)
+                 index.ts · windows.ts · tray.ts · ipc.ts · protocol.ts (cubby-file://)
+src/preload/     the bridge (invoke, onEvent, pathForFile)
+src/renderer/    Vue app: pages/, components/{ui,shell,common,brands,posts,media,flows,claude,…}
+docs/            PLAN.md, BUILD.md
+```
 
 ## 14. Phase 0 results (2026-10-11, Windows 11, Chrome 154.0.8037.98)
 
