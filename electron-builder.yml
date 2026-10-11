@@ -17,6 +17,9 @@ extraResources:
     to: resources
 win:
   executableName: Cubby
+  files:
+    - '!node_modules/ffprobe-static/bin/{darwin,linux}/**'
+    - '!node_modules/ffprobe-static/bin/win32/ia32/**'
   target: [nsis]
 nsis:
   artifactName: Cubby-${version}-setup.${ext}
@@ -27,6 +30,8 @@ nsis:
   allowToChangeInstallationDirectory: true
 mac:
   target: [dmg]
+  files:
+    - '!node_modules/ffprobe-static/bin/{win32,linux}/**'
   category: public.app-category.productivity
   entitlementsInherit: build/entitlements.mac.plist
   notarize: false
