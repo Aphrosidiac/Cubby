@@ -218,7 +218,8 @@ function goDetail(b: BrandRow) { void router.push(`/brands/${b.id}`); }
 const search = ref<HTMLInputElement | null>(null);
 function onKey(e: KeyboardEvent) {
   const t = e.target as HTMLElement | null;
-  const typing = !!t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
+  // a focused checkbox (just used to select rows) is not "typing": Esc should still clear the selection
+  const typing = !!t && (t.isContentEditable || ['TEXTAREA', 'SELECT'].includes(t.tagName) || (t.tagName === 'INPUT' && !['checkbox', 'radio', 'button'].includes((t as HTMLInputElement).type)));
   if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); e.stopImmediatePropagation(); search.value?.focus(); search.value?.select(); }
   else if (e.key === 'Escape' && filtersOpen.value && !document.querySelector('.ff-select-pop')) { filtersOpen.value = false; }
   else if (e.key === 'Escape' && overlay.value) { overlay.value = false; }
@@ -288,9 +289,9 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
             </button>
             <Transition name="pop">
               <div v-if="filtersOpen" class="fpop" role="dialog" aria-label="Filters" @keydown.esc.stop="filtersOpen = false">
-                <Field label="Platform"><Select :model-value="filter.platform ?? null" :options="platformOpts" aria-label="Platform" @update:model-value="v => setF('platform', v)" /></Field>
-                <Field label="Login"><Select :model-value="filter.loginState ?? null" :options="loginOpts" aria-label="Login state" @update:model-value="v => setF('loginState', v)" /></Field>
-                <Field label="Status"><Select :model-value="filter.status ?? null" :options="statusOpts" aria-label="Status" @update:model-value="v => setF('status', v)" /></Field>
+                <Select :model-value="filter.platform ?? null" :options="platformOpts" aria-label="Platform" @update:model-value="v => setF('platform', v)" />
+                <Select :model-value="filter.loginState ?? null" :options="loginOpts" aria-label="Login state" @update:model-value="v => setF('loginState', v)" />
+                <Select :model-value="filter.status ?? null" :options="statusOpts" aria-label="Status" @update:model-value="v => setF('status', v)" />
                 <button v-if="pillCount" type="button" class="link small freset" @click="setF('platform', null); setF('loginState', null); setF('status', null)">Reset these filters</button>
               </div>
             </Transition>
@@ -383,8 +384,8 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
 .ftg { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 13px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--fg-2); font-weight: 500; white-space: nowrap; transition: border-color 160ms, color 160ms; }
 .ftg:hover, .ftg.on { border-color: var(--line-strong); color: var(--fg); }
 .fcount { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--fg); color: var(--bg); font-family: var(--mono); font-size: var(--fs-2xs); }
-.fpop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 260px; display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-2); }
-.freset { align-self: flex-start; }
+.fpop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 240px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-2); }
+.freset { align-self: flex-start; margin: 2px 2px 0; }
 .vt { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: var(--r-pill); background: var(--panel-2); border: 1px solid var(--line-soft); flex: none; }
 .vt button { width: 34px; height: 30px; display: grid; place-items: center; border-radius: var(--r-pill); color: var(--muted); transition: background-color 200ms var(--ease-out), color 200ms; }
 .vt button:hover { color: var(--fg); }

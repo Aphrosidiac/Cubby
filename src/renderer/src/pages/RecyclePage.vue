@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Recycle bin (PLAN 6.12): deleted brands stay 30 days with their profiles; Restore or Delete forever.
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { BrandRow } from '@shared/types';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import Btn from '@/components/ui/Btn.vue';
@@ -38,13 +38,27 @@ async function purge(bs: BrandRow[], all = false) {
   try { await api('brands.purge', { ids: bs.map(b => b.id) }); ok(one ? `${bs[0].name} deleted` : 'Recycle bin emptied'); }
   catch (e) { fail(e, 'Could not delete'); } finally { busy.value = null; }
 }
-const cols = [
-  { key: 'name', label: 'Brand' },
-  { key: 'accounts', label: 'Accounts', hideSm: true },
-  { key: 'deletedAt', label: 'Deleted', sortable: true },
-  { key: 'left', label: 'Deleted forever in' },
-  { key: 'actions', label: '', align: 'right' as const }
-];
+// Narrow windows (the 980 px minimum): accounts fold away and "deleted forever in" moves under the date,
+// so the row never runs past the window.
+const mq = window.matchMedia('(max-width: 1180px)');
+const narrow = ref(mq.matches);
+const onMq = (e: MediaQueryListEvent) => (narrow.value = e.matches);
+onMounted(() => mq.addEventListener('change', onMq));
+onBeforeUnmount(() => mq.removeEventListener('change', onMq));
+const cols = computed(() => narrow.value
+  ? [
+      { key: 'name', label: 'Brand' },
+      { key: 'deletedAt', label: 'Deleted', sortable: true },
+      { key: 'actions', label: '', align: 'right' as const }
+    ]
+  : [
+      { key: 'name', label: 'Brand' },
+      { key: 'accounts', label: 'Accounts', hideSm: true },
+      { key: 'deletedAt', label: 'Deleted', sortable: true },
+      { key: 'left', label: 'Deleted forever in' },
+      { key: 'actions', label: '', align: 'right' as const }
+    ]);
+const leftText = (b: BrandRow) => (left(b) === 0 ? 'Today' : `${left(b)} day${left(b) === 1 ? '' : 's'}`);
 </script>
 
 <template>
@@ -65,8 +79,11 @@ const cols = [
       <template #cell-accounts="{ row }">
         <div class="row gap-2"><PlatformIcon v-for="a in row.accounts" :key="a.id" :platform="a.platform" :size="15" :title="a.handle" /><span v-if="!row.accounts.length" class="faint">—</span></div>
       </template>
-      <template #cell-deletedAt="{ row }"><span class="small nowrap" :title="dateTime(row.deletedAt)">{{ date(row.deletedAt) }}</span></template>
-      <template #cell-left="{ row }"><span class="small nowrap num" :class="{ soon: left(row) <= 3 }">{{ left(row) === 0 ? 'Today' : `${left(row)} day${left(row) === 1 ? '' : 's'}` }}</span></template>
+      <template #cell-deletedAt="{ row }">
+        <div class="small nowrap" :title="dateTime(row.deletedAt)">{{ date(row.deletedAt) }}</div>
+        <div v-if="narrow" class="tiny nowrap num" :class="left(row) <= 3 ? 'soon' : 'muted'">{{ left(row) === 0 ? 'Deleted forever today' : `Deleted forever in ${leftText(row)}` }}</div>
+      </template>
+      <template #cell-left="{ row }"><span class="small nowrap num" :class="{ soon: left(row) <= 3 }">{{ leftText(row) }}</span></template>
       <template #cell-actions="{ row }">
         <div class="row gap-2 end nowrap">
           <Btn size="sm" icon="undo" :loading="busy === `r-${row.id}`" @click="restore([row])">Restore</Btn>
@@ -84,7 +101,7 @@ const cols = [
 
 <style scoped>
 .nm { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.nm-t { min-width: 0; max-width: 300px; }
+.nm-t { min-width: 0; max-width: 260px; }
 .dim { filter: grayscale(.6); opacity: .8; }
 .soon { color: var(--bad); font-weight: 500; }
 </style>
