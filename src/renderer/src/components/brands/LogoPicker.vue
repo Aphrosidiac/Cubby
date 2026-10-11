@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import Btn from '@/components/ui/Btn.vue';
 import Icon from '@/components/ui/Icon.vue';
 import BrandAvatar from '@/components/common/BrandAvatar.vue';
+import { lightLogo } from '@/components/common/logoTone';
 import { api } from '@/lib/api';
 import { fail } from '@/composables/toast';
 
@@ -45,7 +46,7 @@ void props;
     <Transition name="slide-down">
       <div v-if="showKits && kits?.length">
         <div class="kits mt-3">
-          <button v-for="k in kits" :key="k.path" type="button" class="kit" :class="{ sel: modelValue === k.dataUrl }" :title="k.name" @click="emit('update:modelValue', k.dataUrl); showKits = false">
+          <button v-for="k in kits" :key="k.path" type="button" class="kit" :class="{ sel: modelValue === k.dataUrl, ink: lightLogo(k.dataUrl) === true }" :title="k.name" :aria-label="`Use ${k.name.split(/[\\/]/).pop()}`" :aria-pressed="modelValue === k.dataUrl" @click="emit('update:modelValue', k.dataUrl); showKits = false">
             <img :src="k.dataUrl" alt="" />
             <Icon v-if="modelValue === k.dataUrl" name="check" :size="12" class="tick" />
           </button>
@@ -59,7 +60,8 @@ void props;
 <style scoped>
 .kits { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; max-height: 236px; overflow-y: auto; padding: 2px; }
 .kit { position: relative; aspect-ratio: 1; border-radius: 8px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; padding: 10px; transition: border-color 200ms, transform 240ms var(--ease-out); }
-.kit:hover { border-color: var(--fg); transform: translateY(-1px); }
+.kit.ink { background: #0b0b0a; border-color: #2a2a27; }
+.kit:hover, .kit:focus-visible { border-color: var(--fg); transform: translateY(-1px); }
 .kit.sel { border-color: var(--fg); box-shadow: 0 0 0 2px var(--fg); }
 .kit img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .tick { position: absolute; top: 4px; right: 4px; color: var(--ink); background: var(--lime); border-radius: 50%; padding: 1px; }

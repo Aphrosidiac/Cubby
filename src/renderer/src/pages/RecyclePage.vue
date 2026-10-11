@@ -60,15 +60,15 @@ const cols = [
     <LoadError v-if="list.error.value" :error="list.error.value" title="Could not load the recycle bin" @retry="list.reload()" />
     <DataTable v-else :columns="cols" :rows="rows" :loading="list.loading.value" :clickable="false">
       <template #cell-name="{ row }">
-        <div class="nm"><BrandAvatar :brand="row" :size="30" class="dim" /><div><div class="strong">{{ row.name }}</div><div class="tiny muted code">{{ serialText(row.serial) }}{{ row.groupName ? ` · ${row.groupName}` : '' }}</div></div></div>
+        <div class="nm"><BrandAvatar :brand="row" :size="30" class="dim" /><div class="nm-t" :title="row.name"><div class="strong ellipsis">{{ row.name }}</div><div class="tiny muted code ellipsis">{{ serialText(row.serial) }}{{ row.groupName ? ` · ${row.groupName}` : '' }}</div></div></div>
       </template>
       <template #cell-accounts="{ row }">
         <div class="row gap-2"><PlatformIcon v-for="a in row.accounts" :key="a.id" :platform="a.platform" :size="15" :title="a.handle" /><span v-if="!row.accounts.length" class="faint">—</span></div>
       </template>
-      <template #cell-deletedAt="{ row }"><span class="small" :title="dateTime(row.deletedAt)">{{ date(row.deletedAt) }}</span></template>
-      <template #cell-left="{ row }"><span class="small" :class="{ soon: left(row) <= 3 }">{{ left(row) === 0 ? 'Today' : `${left(row)} day${left(row) === 1 ? '' : 's'}` }}</span></template>
+      <template #cell-deletedAt="{ row }"><span class="small nowrap" :title="dateTime(row.deletedAt)">{{ date(row.deletedAt) }}</span></template>
+      <template #cell-left="{ row }"><span class="small nowrap num" :class="{ soon: left(row) <= 3 }">{{ left(row) === 0 ? 'Today' : `${left(row)} day${left(row) === 1 ? '' : 's'}` }}</span></template>
       <template #cell-actions="{ row }">
-        <div class="row gap-2 end">
+        <div class="row gap-2 end nowrap">
           <Btn size="sm" icon="undo" :loading="busy === `r-${row.id}`" @click="restore([row])">Restore</Btn>
           <Btn size="sm" variant="danger" :loading="busy === `p-${row.id}`" @click="purge([row])">Delete forever</Btn>
         </div>
@@ -83,7 +83,8 @@ const cols = [
 </template>
 
 <style scoped>
-.nm { display: flex; align-items: center; gap: 12px; }
+.nm { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.nm-t { min-width: 0; max-width: 300px; }
 .dim { filter: grayscale(.6); opacity: .8; }
 .soon { color: var(--bad); font-weight: 500; }
 </style>

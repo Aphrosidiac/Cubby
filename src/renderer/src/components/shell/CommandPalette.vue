@@ -10,6 +10,7 @@ import PlatformIcon from '../common/PlatformIcon.vue';
 import { fuzzyScore, rankBrands } from '../common/fuzzy';
 import { accountTip, serialText, STATUS_LABEL } from '../common/login';
 import { useBrandActions } from '../brands/actions';
+import { importBrandFile, pickCsvAndCreate } from '../brands/importers';
 import { NAV, NAV_FOOT } from '@/lib/nav';
 import { api, modKey } from '@/lib/api';
 import { app, setTheme } from '@/lib/store';
@@ -27,8 +28,19 @@ const listEl = ref<HTMLElement | null>(null);
 const brands = ref<BrandRow[] | null>(null);
 const loadErr = ref<string | null>(null);
 
+// focus goes back to whatever had it before the palette opened (unless an action moved it)
+let returnTo: HTMLElement | null = null;
 watch(() => props.open, async o => {
-  if (!o) return;
+  if (!o) {
+    const el = returnTo;
+    returnTo = null;
+    setTimeout(() => {
+      const a = document.activeElement;
+      if (el?.isConnected && (!a || a === document.body || a.closest('.cp-root'))) el.focus({ preventScroll: true });
+    }, 0);
+    return;
+  }
+  returnTo = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
   q.value = '';
   active.value = 0;
   await nextTick();
@@ -53,7 +65,8 @@ const ACTIONS = computed<Item[]>(() => [
   { key: 'a-cascade', kind: 'action', label: 'Cascade open brand windows', icon: 'cascade', run: guard(() => api('brands.arrange', { mode: 'cascade' }), 'Could not cascade') },
   { key: 'a-closeall', kind: 'action', label: 'Close all brand windows', icon: 'close', run: guard(async () => { if (await confirm({ title: 'Close every open brand window?', confirm: 'Close all' })) await api('brands.closeAll'); }) },
   { key: 'a-health', kind: 'action', label: 'Check every login now', icon: 'pulse', run: guard(async () => { const r = await api('health.check', {}); const bad = r.filter(a => a.loginState === 'expired').length; if (bad) toast(`${bad} login${bad === 1 ? '' : 's'} need relogin`, { tone: 'warn' }); else ok(`Checked ${r.length} logins`); }, 'Health check failed') },
-  { key: 'a-import', kind: 'action', label: 'Import brands from CSV or .brand', icon: 'upload', run: () => router.push('/') },
+  { key: 'a-csv', kind: 'action', label: 'Batch create brands from CSV…', icon: 'file', run: () => pickCsvAndCreate() },
+  { key: 'a-import', kind: 'action', label: 'Import a .brand export…', icon: 'upload', run: () => importBrandFile() },
   { key: 'a-theme', kind: 'action', label: app.settings?.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme', icon: app.settings?.theme === 'dark' ? 'sun' : 'moon', run: () => setTheme(app.settings?.theme === 'dark' ? 'light' : 'dark') },
   { key: 'a-backup', kind: 'action', label: 'Back up now', icon: 'backup', run: guard(async () => { const r = await api('backup.run', {}); ok('Backup saved', r.path); }, 'Backup failed') }
 ]);
@@ -67,7 +80,9 @@ const sections = computed(() => {
   const s = q.value.trim();
   const all = brands.value ?? [];
   const bs = s ? rankBrands(all, s).slice(0, 8) : [...all].sort((a, b) => Number(b.status === 'open') - Number(a.status === 'open')).slice(0, 6);
-  const match = (it: Item) => !s || fuzzyScore(s, it.label) > 0 || (it.sub ? fuzzyScore(s, it.sub) > 0 : false);
+  // actions and pages need a real match (prefix, word, substring or tight letters), not three
+  // letters scattered across a long label — "sun" must not offer "Stop all automation"
+  const match = (it: Item) => !s || fuzzyScore(s, it.label) >= 10 || (it.sub ? fuzzyScore(s, it.sub) >= 40 : false);
   const rank = (xs: Item[]) => (s ? xs.filter(match).sort((a, b) => fuzzyScore(s, b.label) - fuzzyScore(s, a.label)) : xs);
   return [
     { title: 'Brands', items: bs.map(brandItem) },
@@ -114,8 +129,8 @@ const idxOf = (it: Item) => flat.value.indexOf(it);
                 <template v-if="it.brand">
                   <BrandAvatar :brand="it.brand" :size="28" />
                   <div class="grow">
-                    <div class="nm"><span class="ellipsis">{{ it.brand.name }}</span><span class="code faint">{{ serialText(it.brand.serial) }}</span></div>
-                    <div class="ac tiny muted"><PlatformIcon v-for="a in it.brand.accounts.slice(0, 6)" :key="a.id" :platform="a.platform" :size="12" :title="accountTip(a)" /><span v-if="it.brand.groupName">{{ it.brand.groupName }}</span><span v-if="it.brand.accounts.some(a => a.loginState === 'expired')" class="relog">needs relogin</span></div>
+                    <div class="nm"><span class="ellipsis" :title="it.brand.name">{{ it.brand.name }}</span><span class="code muted ser">{{ serialText(it.brand.serial) }}</span></div>
+                    <div class="ac tiny muted"><PlatformIcon v-for="a in it.brand.accounts.slice(0, 6)" :key="a.id" :platform="a.platform" :size="12" :title="accountTip(a)" /><span v-if="it.brand.accounts.length > 6" class="num">+{{ it.brand.accounts.length - 6 }}</span><span v-if="it.brand.groupName" class="ellipsis">{{ it.brand.groupName }}</span><span v-if="it.brand.accounts.some(a => a.loginState === 'expired')" class="relog nowrap">needs relogin</span></div>
                   </div>
                   <span class="st" :class="`s-${it.brand.status}`">{{ STATUS_LABEL[it.brand.status] }}</span>
                   <span class="go"><span>{{ it.brand.status === 'open' ? 'Front' : 'Open' }}</span><kbd>↵</kbd><span class="sep">·</span><span>Page</span><kbd>⇧↵</kbd></span>
@@ -148,7 +163,9 @@ const idxOf = (it: Item) => flat.value.indexOf(it);
 .it { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: 9px; cursor: pointer; min-height: 44px; }
 .it.act { background: var(--panel-2); }
 .nm { display: flex; align-items: baseline; gap: 8px; font-weight: 600; min-width: 0; }
-.ac { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.ser { flex: none; font-weight: 400; }
+.ac { display: flex; align-items: center; gap: 6px; margin-top: 3px; min-width: 0; }
+.ac .pi { flex: none; }
 .relog { color: var(--bad); }
 .ic { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--panel-2); color: var(--fg-2); flex: none; }
 .it.act .ic { background: var(--fg); color: var(--bg); }
@@ -156,7 +173,7 @@ const idxOf = (it: Item) => flat.value.indexOf(it);
 .st { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
 .s-open { color: var(--good); } .s-error { color: var(--bad); } .s-opening { color: var(--info); }
 .go { display: none; align-items: center; gap: 5px; font-size: var(--fs-xs); color: var(--fg-2); white-space: nowrap; }
-.go .sep { color: var(--faint); }
+.go .sep { color: var(--muted); }
 .it.act .go { display: inline-flex; }
 .it.act .st { display: none; }
 .none { padding: 26px; text-align: center; color: var(--muted); font-size: var(--fs-sm); }

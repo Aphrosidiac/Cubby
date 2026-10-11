@@ -64,9 +64,9 @@ onMounted(() => {
 .side a, .side button { -webkit-app-region: no-drag; }
 .collapsed { width: var(--sidebar-rail); }
 .brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: var(--topbar); padding: 0 12px 0 20px; }
-:global(.mac) .brand { padding-left: 86px; }
+.mac .brand { padding-left: 86px; }
 .collapsed .brand { padding: 0; justify-content: center; }
-:global(.mac) .collapsed .brand { padding-top: 26px; }
+.mac .collapsed .brand { padding-top: 26px; }
 .logo { display: flex; align-items: center; gap: 10px; color: var(--side-fg); }
 .name { font-size: var(--fs-md); font-weight: 600; letter-spacing: -.01em; }
 .collapse { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--side-muted); transition: background-color 200ms, color 200ms; }

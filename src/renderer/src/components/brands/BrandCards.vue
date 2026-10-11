@@ -9,7 +9,7 @@ import AccountBadge from '@/components/common/AccountBadge.vue';
 import BrandStatus from './BrandStatus.vue';
 import { useBrandActions } from './actions';
 import { serialText } from '@/components/common/login';
-import { ago } from '@/lib/format';
+import { ago, dateTime } from '@/lib/format';
 
 /** Card view of the brands list: the same data and actions as the table, laid out as tiles. */
 const props = defineProps<{ rows: BrandRow[] | null; loading?: boolean; selected: Set<string>; menuExtra?: (b: BrandRow) => MenuItem[]; groupColor?: (id: string | null) => string | null }>();
@@ -40,28 +40,28 @@ function key(e: KeyboardEvent, b: BrandRow) {
           <BrandAvatar :brand="b" :size="44" />
           <div class="grow">
             <div class="strong ellipsis nm" :title="b.notes ? `${b.name} — ${b.notes}` : b.name">{{ b.name }}</div>
-            <div class="tiny muted row gap-1"><span class="code">{{ serialText(b.serial) }}</span><span v-if="b.groupName">· {{ b.groupName }}</span></div>
+            <div class="tiny muted meta"><span class="code">{{ serialText(b.serial) }}</span><template v-if="b.groupName"><span aria-hidden="true">·</span><span class="swatch" :style="{ background: groupColor?.(b.groupId) ?? 'var(--faint)' }" /><span class="ellipsis">{{ b.groupName }}</span></template></div>
           </div>
           <input type="checkbox" class="cb" :checked="selected.has(b.id)" :aria-label="`Select ${b.name}`" @click.stop="toggle(b)" />
         </header>
-        <p v-if="b.notes" class="tiny muted notes">{{ b.notes }}</p>
+        <p v-if="b.notes" class="tiny muted notes" :title="b.notes">{{ b.notes }}</p>
         <div class="plats">
           <AccountBadge v-for="a in b.accounts" :key="a.id" :account="a" />
-          <span v-if="!b.accounts.length" class="faint small">No accounts yet</span>
+          <span v-if="!b.accounts.length" class="muted small">No accounts yet</span>
         </div>
         <div v-if="b.tags.length" class="tags" @click.stop>
-          <button v-for="t in b.tags.slice(0, 4)" :key="t" type="button" class="tg" @click="emit('tag', t)">{{ t }}</button>
-          <span v-if="b.tags.length > 4" class="tiny muted">+{{ b.tags.length - 4 }}</span>
+          <button v-for="t in b.tags.slice(0, 4)" :key="t" type="button" class="tg" :title="`Filter by ${t}`" @click="emit('tag', t)">{{ t }}</button>
+          <span v-if="b.tags.length > 4" class="tg-more" :title="b.tags.slice(4).join(', ')">+{{ b.tags.length - 4 }}</span>
         </div>
         <footer class="foot" @click.stop>
-          <div class="grow col gap-1">
+          <div class="grow col gap-1 when">
             <BrandStatus :status="b.status" :error="b.statusError" compact />
-            <span class="tiny faint">{{ b.lastOpenedAt ? `Opened ${ago(b.lastOpenedAt)}` : 'Never opened' }}</span>
+            <span class="tiny muted ellipsis" :title="b.lastOpenedAt ? `Last opened ${dateTime(b.lastOpenedAt)}` : undefined">{{ b.lastOpenedAt ? ago(b.lastOpenedAt) : 'Never opened' }}</span>
           </div>
           <Btn v-if="b.status === 'open' || b.status === 'opening'" size="sm" :loading="act.pending.has(b.id) || b.status === 'opening'" @click="act.close(b)">Close</Btn>
           <Btn v-else size="sm" variant="primary" icon="open" :loading="act.pending.has(b.id)" @click="act.open(b)">{{ b.status === 'error' ? 'Reopen' : 'Open' }}</Btn>
           <Menu :items="act.menu(b, menuExtra?.(b) ?? [])" :width="210">
-            <button type="button" class="more" :aria-label="`More for ${b.name}`"><Icon name="more" :size="18" :stroke="3" /></button>
+            <button type="button" class="more" :aria-label="`More for ${b.name}`" :title="`More for ${b.name}`"><Icon name="more" :size="18" :stroke="3" /></button>
           </Menu>
         </footer>
       </article>
@@ -71,24 +71,31 @@ function key(e: KeyboardEvent, b: BrandRow) {
 </template>
 
 <style scoped>
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
 .empty-slot { grid-column: 1 / -1; }
 .card { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 12px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); cursor: pointer; outline: none; animation: ff-rise 560ms var(--ease-out) backwards; animation-delay: calc(var(--i) * 30ms); transition: border-color 200ms, box-shadow 300ms var(--ease-out), transform 300ms var(--ease-out); }
 .card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-1); transform: translateY(-1px); }
 .card:focus-visible { border-color: var(--fg); }
 .card.sel { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg); }
 .band { position: absolute; left: -1px; top: -1px; right: -1px; height: 4px; border-radius: var(--r-lg) var(--r-lg) 0 0; background: var(--c); opacity: .85; }
+/* very dark brand colours would vanish on Ink: a hairline keeps the band visible */
+[data-theme='dark'] .band { opacity: 1; box-shadow: inset 0 0 0 1px rgb(243 239 228 / .22); }
 .top { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .nm { font-size: var(--fs-md); }
 .cb { width: 15px; height: 15px; accent-color: var(--fg); cursor: pointer; align-self: flex-start; opacity: 0; transition: opacity 160ms; }
-.card:hover .cb, .card.sel .cb, .cb:focus-visible { opacity: 1; }
+.card:hover .cb, .card.sel .cb, .card:focus-within .cb { opacity: 1; }
 .notes { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
 .plats { display: flex; gap: 5px; flex-wrap: wrap; min-height: 26px; align-items: center; }
-.tags { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-.tg { height: 21px; padding: 0 8px; border-radius: var(--r-pill); background: var(--panel-2); color: var(--fg-2); font-size: var(--fs-xs); font-weight: 500; }
-.tg:hover { background: var(--line); }
+.meta { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 1px; }
+.meta .swatch { width: 8px; height: 8px; border-radius: 2px; }
+[data-theme='dark'] .meta .swatch { box-shadow: inset 0 0 0 1px rgb(243 239 228 / .3); }
+.tags { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; min-width: 0; }
+.tg { height: 21px; max-width: 100%; padding: 0 8px; border-radius: var(--r-pill); background: var(--panel-2); color: var(--fg-2); font-size: var(--fs-xs); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background-color 160ms, color 160ms; }
+.tg:hover { background: var(--line); color: var(--fg); }
+.tg-more { display: inline-flex; align-items: center; height: 21px; padding: 0 7px; border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-family: var(--mono); font-size: var(--fs-2xs); cursor: help; }
 .foot { display: flex; align-items: center; gap: 6px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line-soft); cursor: default; }
-.more { width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 50%; color: var(--muted); }
-.more:hover { background: var(--panel-2); color: var(--fg); }
+.when { min-width: 0; }
+.more { width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 50%; color: var(--muted); transition: background-color 160ms, color 160ms; }
+.more:hover, .more:focus-visible { background: var(--panel-2); color: var(--fg); }
 .skel-card { min-height: 190px; cursor: default; }
 </style>
