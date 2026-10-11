@@ -21,7 +21,8 @@ import { maskTokens } from '../tokens/token'
 import { buildAddArgs, buildRemoveArgs, commandLine, findClaudeCli, runCli } from './connect'
 import { SERVER_INSTRUCTIONS, TOOLS, json, type Content, type ToolEnv, type ToolSpec } from './tools'
 
-const IDLE_CLOSE_MS = 12 * 3600_000
+// a client that vanished without ending its session stops showing as connected after 30 idle minutes
+const IDLE_CLOSE_MS = 30 * 60_000
 
 interface Session {
   id: string
