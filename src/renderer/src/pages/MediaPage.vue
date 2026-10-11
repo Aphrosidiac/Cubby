@@ -107,7 +107,7 @@ const columns: Column[] = [
       </template>
     </PageHeader>
 
-    <div class="toolbar">
+    <div v-if="data?.length || filtered || loading" class="toolbar">
       <label class="search"><Icon name="search" :size="15" /><input v-model="q" placeholder="Search file names and tags" aria-label="Search media" @keydown.esc="q = ''" /></label>
       <Select v-model="tag" variant="pill" :options="tagOptions" aria-label="Filter by tag" :min-width="180" />
       <Segmented v-model="kind" size="sm" :options="[{ value: 'all', label: 'All' }, { value: 'video', label: 'Video', icon: 'video' }, { value: 'image', label: 'Image', icon: 'image' }]" />

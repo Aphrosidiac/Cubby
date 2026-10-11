@@ -60,6 +60,7 @@ function fill(f: Flow | null) {
   if (p.kind === 'hourly') minute.value = p.minute;
   if (p.kind === 'daily' || p.kind === 'weekdays') at.value = p.time;
   if (p.kind === 'custom') cron.value = p.cron;
+  snapshot(); // same tick as the fill: "Unsaved changes" never renders while the page settles
   setTimeout(snapshot, 0);
 }
 async function load() {
@@ -70,7 +71,6 @@ async function load() {
   catch (e) { loadError.value = (e as Error).message; }
   finally { loading.value = false; }
 }
-watch(() => route.params.id, id => { if (id && route.path.startsWith('/flows/')) void load(); }, { immediate: true });
 
 const preset = computed<SchedulePreset>(() => sched.value === 'hourly' ? { kind: 'hourly', minute: minute.value } : sched.value === 'daily' ? { kind: 'daily', time: at.value } : sched.value === 'weekdays' ? { kind: 'weekdays', time: at.value } : sched.value === 'custom' ? { kind: 'custom', cron: cron.value } : { kind: 'off' });
 const schedule = computed(() => buildSchedule(preset.value));
@@ -173,7 +173,10 @@ const recElapsed = computed(() => { void recTick.value; const s = recording.valu
 const snap = ref('');
 const state = () => JSON.stringify([name.value, scope.value, brandIds.value, steps.value, enabled.value, schedule.value]);
 function snapshot() { snap.value = state(); }
-const dirty = computed(() => state() !== snap.value);
+// nothing to lose while the flow is loading or could not be opened
+const dirty = computed(() => !loading.value && !loadError.value && state() !== snap.value);
+// load last: fill() snapshots synchronously, so everything state() reads must exist already
+watch(() => route.params.id, id => { if (id && route.path.startsWith('/flows/')) void load(); }, { immediate: true });
 onBeforeRouteLeave(async () => {
   if (recording.value) { if (!(await confirm({ title: 'Stop recording and leave?', confirm: 'Stop and leave', danger: true }))) return false; await recStop(); }
   if (!dirty.value) return true;
@@ -194,10 +197,10 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
 <template>
   <div class="page flow-editor">
     <PageHeader eyebrow="Flow" :title="isNew ? 'New flow' : name || flow?.name || 'Flow'" :back="{ to: '/flows', label: 'Flows' }">
-      <span>{{ countSteps(steps) }} {{ countSteps(steps) === 1 ? 'step' : 'steps' }} · {{ schedText }}</span>
+      <span v-if="!loadError && !loading">{{ countSteps(steps) }} {{ countSteps(steps) === 1 ? 'step' : 'steps' }} · {{ schedText }}</span>
       <span v-if="flow?.schedule && flow.enabled && flow.nextRunAt && !dirty">next run {{ fmtWhen(flow.nextRunAt) }}</span>
       <span v-if="dirty" class="unsaved"><span class="udot" />Unsaved changes</span>
-      <template #actions>
+      <template v-if="!loadError" #actions>
         <Menu :items="menu" :width="190"><Btn icon="more" square aria-label="More" title="More" /></Menu>
         <Btn icon="play" :loading="running" :disabled="!steps.length" @click="runNow">Run now</Btn>
         <Btn variant="primary" icon="check" :loading="saving" @click="save">{{ isNew ? 'Create flow' : 'Save' }}</Btn>

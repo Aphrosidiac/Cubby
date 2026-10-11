@@ -30,8 +30,11 @@ import type { Column, MenuItem } from '@/components/ui/types';
 const route = useRoute();
 const router = useRouter();
 useBrands();
-const tab = ref<string>(['flows', 'recipes', 'runs'].includes(String(route.query.tab)) ? String(route.query.tab) : 'flows');
-watch(tab, t => void router.replace({ query: { ...route.query, tab: t === 'flows' ? undefined : t } }));
+const tabOf = (q: unknown) => (['flows', 'recipes', 'runs'].includes(String(q)) ? String(q) : 'flows');
+const tab = ref<string>(tabOf(route.query.tab));
+watch(tab, t => { if (tabOf(route.query.tab) !== t) void router.replace({ query: { ...route.query, tab: t === 'flows' ? undefined : t } }); });
+// the sidebar "Flows" link or a "/flows?tab=runs" link while already here switches the tab too
+watch(() => route.query.tab, q => { if (route.path === '/flows') tab.value = tabOf(q); });
 
 const flows = useLoad(() => api('flows.list'), { topics: ['flows.changed'] });
 const recipes = useLoad(() => api('flows.recipes'));
@@ -96,8 +99,8 @@ const scopeText = (f: Flow) => (f.brandScope === 'any' || !f.brandIds.length ? S
 
 const flowCols: Column[] = [
   { key: 'name', label: 'Flow', sortable: true, class: 'c-fill' },
-  { key: 'brandScope', label: 'Brands', width: '180px' },
-  { key: 'schedule', label: 'Schedule', width: '200px', hideSm: true },
+  { key: 'brandScope', label: 'Brands', width: '180px', class: 'c-brands' },
+  { key: 'schedule', label: 'Schedule', width: '200px', hideSm: true, class: 'c-sched' },
   { key: 'last', label: 'Last run', width: '140px', hideSm: true, class: 'c-wide' },
   { key: 'enabled', label: 'On', width: '60px' },
   { key: 'menu', label: '', width: '46px', align: 'right' }
@@ -133,15 +136,15 @@ const tabs = computed(() => [
       <!-- flows -->
       <template v-if="tab === 'flows'">
         <EmptyState v-if="flows.error.value && !flows.data.value" icon="warn" title="Flows aren’t available yet" :body="flows.error.value"><Btn size="sm" icon="refresh" @click="flows.reload()">Try again</Btn></EmptyState>
-        <DataTable v-else :columns="flowCols" :rows="flows.data.value" :loading="flows.loading.value" @row-click="r => router.push(`/flows/${r.id}`)">
+        <DataTable v-else :class="{ 'is-empty': flows.data.value?.length === 0 }" :columns="flowCols" :rows="flows.data.value" :loading="flows.loading.value" @row-click="r => router.push(`/flows/${r.id}`)">
           <template #cell-name="{ row }">
             <div class="strong ellipsis" :title="row.name">{{ row.name }}</div>
             <div class="tiny muted ellipsis"><span class="num">{{ countSteps(row.steps) }}</span> {{ countSteps(row.steps) === 1 ? 'step' : 'steps' }}<span v-if="lastRun.get(row.id)" class="narrow-only"> · last run {{ runStatus(lastRun.get(row.id)!.status).label.toLowerCase() }} {{ ago(lastRun.get(row.id)!.startedAt) }}</span></div>
           </template>
           <template #cell-brandScope="{ row }">
-            <div class="row gap-2">
+            <div class="row gap-2" :title="row.brandIds.length ? row.brandIds.map(brandName).join(', ') : undefined">
               <span v-if="row.brandIds.length" class="avs"><BrandAvatar v-for="id in row.brandIds.slice(0, 4)" :key="id" :brand="brandOrStub(id)" :size="20" /></span>
-              <span class="small muted ellipsis" :title="row.brandIds.length > 2 ? row.brandIds.map(brandName).join(', ') : undefined">{{ scopeText(row as Flow) }}</span>
+              <span class="small muted ellipsis" :class="{ 'wide-only': row.brandIds.length }">{{ scopeText(row as Flow) }}</span>
             </div>
           </template>
           <template #cell-schedule="{ row }">
@@ -200,7 +203,7 @@ const tabs = computed(() => [
       <!-- runs -->
       <template v-else>
         <EmptyState v-if="runs.error.value && !runs.data.value" icon="warn" title="Run history isn’t available yet" :body="runs.error.value"><Btn size="sm" icon="refresh" @click="runs.reload()">Try again</Btn></EmptyState>
-        <DataTable v-else :columns="runCols" :rows="runs.data.value" :loading="runs.loading.value" dense @row-click="r => router.push(`/runs/${r.id}`)">
+        <DataTable v-else :class="{ 'is-empty': runs.data.value?.length === 0 }" :columns="runCols" :rows="runs.data.value" :loading="runs.loading.value" dense @row-click="r => router.push(`/runs/${r.id}`)">
           <template #cell-label="{ row }"><div class="ellipsis strongish" :title="row.label">{{ row.label }}</div><div v-if="row.error" class="tiny ellipsis" :class="row.status === 'needs_human' ? 'warnt' : row.status === 'aborted' ? 'muted' : 'bad'" :title="row.error">{{ row.error }}</div></template>
           <template #cell-brandId="{ row }"><span class="row gap-2"><BrandAvatar :brand="brandOrStub(row.brandId)" :size="18" /><span class="small ellipsis" :title="brandName(row.brandId)">{{ brandName(row.brandId) }}</span></span></template>
           <template #cell-actor="{ row }"><ActorChip :actor="row.actor" /></template>
@@ -227,6 +230,10 @@ const tabs = computed(() => [
 @media (max-width: 1180px) {
   .flows :deep(.c-wide) { display: none; }
   .narrow-only { display: inline; }
+  /* brands shrink to their avatars (names in the tooltip), the schedule column narrows */
+  .wide-only { display: none; }
+  .flows :deep(th.c-brands) { width: 104px !important; }
+  .flows :deep(th.c-sched) { width: 176px !important; }
 }
 .avs { display: inline-flex; }
 .avs > * + * { margin-left: -6px; box-shadow: 0 0 0 2px var(--bg); }
@@ -244,5 +251,7 @@ const tabs = computed(() => [
 .rfoot { gap: 10px; }
 /* menus in the last rows must not be clipped by the table's scroll box (columns fold before it could overflow) */
 .flows :deep(.ff-table) { overflow: visible; }
+/* no column headings over an empty state */
+.flows :deep(.ff-table.is-empty thead) { display: none; }
 .mt-1 { margin-top: 2px; }
 </style>
