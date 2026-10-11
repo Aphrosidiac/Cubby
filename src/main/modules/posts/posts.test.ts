@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { MediaAsset, PostStatus } from '@shared/types'
 import { captionFor, captionProblems, fitPost } from './fit'
-import { afterPrepare, canDo, initialStatus, nextStatus, runOutcome, TERMINAL, TRANSITIONS, transitionError } from './state'
+import { afterPrepare, canDo, initialStatus, nextStatus, runOutcome, TERMINAL, TRANSITIONS, timeChangeEvent, transitionError } from './state'
 
 describe('post state machine', () => {
   it('prepare → ready_for_approval → approve → run → posted', () => {
@@ -15,6 +15,14 @@ describe('post state machine', () => {
     s = nextStatus(s, 'run')!
     expect(s).toBe('running')
     expect(nextStatus(s, 'posted')).toBe('posted')
+  })
+  it('a new time reschedules waiting posts and starts failed / stuck ones over as a draft', () => {
+    for (const s of ['draft', 'ready_for_approval', 'approved', 'queued'] as PostStatus[]) expect(timeChangeEvent(s)).toBe('reschedule')
+    for (const s of ['failed', 'needs_human'] as PostStatus[]) {
+      expect(timeChangeEvent(s)).toBe('edit')
+      expect(nextStatus(s, 'edit')).toBe('draft')
+    }
+    for (const s of ['running', 'posted', 'cancelled'] as PostStatus[]) expect(timeChangeEvent(s)).toBeNull()
   })
   it('reject goes back to draft', () => {
     expect(nextStatus('ready_for_approval', 'reject')).toBe('draft')

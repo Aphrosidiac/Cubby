@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // Composer (PLAN 6.4): brand → accounts → kind → media → caption + per-platform overrides,
 // live platform fit, preview, then Save draft · Post now · Schedule · Add to queue.
-import { computed, onMounted, ref, watch } from 'vue';
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router';
 import type { AccountSummary, FitLevel, MediaAsset, PerPlatformOptions, Platform, Post, PostKind } from '@shared/types';
 import { POST_KINDS } from '@shared/types';
 import { PLATFORM_SPECS, countHashtags, fitTarget, gradeMedia } from '@shared/platforms';
@@ -24,9 +24,10 @@ import PreviewCard from '@/components/posts/PreviewCard.vue';
 import DuplicateModal from '@/components/posts/DuplicateModal.vue';
 import MediaPickerDrawer from '@/components/media/MediaPickerDrawer.vue';
 import AssetDrawer from '@/components/media/AssetDrawer.vue';
-import { KIND_LABEL, EDITABLE, brandById, postStatus, useBrands } from '@/components/posts/meta';
+import { KIND_LABEL, EDITABLE, RETRYABLE, brandById, errorFor, postStatus, useBrands } from '@/components/posts/meta';
+import { ago } from '@/lib/format';
 import { fmtWhen, fromWall, splitWall, tzLabel } from '@/components/posts/time';
-import { api } from '@/lib/api';
+import { api, on } from '@/lib/api';
 import { fail, ok, toast } from '@/composables/toast';
 import { confirm } from '@/composables/confirm';
 import { useShortcuts } from '@/composables/shortcuts';
@@ -43,7 +44,8 @@ const brands = useBrands();
 const brandId = ref<string | null>(null);
 const accounts = ref<Acc[]>([]);
 const accountsLoading = ref(false);
-const accountIds = ref<string[]>([]);
+/** What the person ticked. Accounts whose platform can't take the current kind are left out of the post (see accountIds). */
+const picked = ref<string[]>([]);
 const kind = ref<PostKind>('reel');
 const assets = ref<MediaAsset[]>([]);
 const caption = ref('');
@@ -57,10 +59,18 @@ const loadError = ref<string | null>(null);
 let restoring = false;
 
 const brand = computed(() => brandById(brandId.value));
+const supports = (a: Acc, k: PostKind) => PLATFORM_SPECS[a.platform]?.kinds.includes(k) ?? false;
+/** account id → why it can't take this kind ("X has no reel posts") */
+const unavailable = computed<Record<string, string>>(() => Object.fromEntries(accounts.value.filter(a => !supports(a, kind.value)).map(a => [a.id, `${PLATFORM_SPECS[a.platform]?.name ?? a.platform} has no ${KIND_LABEL[kind.value].toLowerCase()} posts`])));
+/** The accounts the post goes to: ticked and able to take the kind. */
+const accountIds = computed(() => picked.value.filter(id => accounts.value.some(a => a.id === id) && !unavailable.value[id]));
+const leftOut = computed(() => accounts.value.filter(a => unavailable.value[a.id]));
 const selected = computed(() => accounts.value.filter(a => accountIds.value.includes(a.id)));
 const platforms = computed(() => [...new Set(selected.value.map(a => a.platform))] as Platform[]);
 const readOnly = computed(() => !!editing.value && !EDITABLE.includes(editing.value.status));
 const isDraftEdit = computed(() => editing.value?.status === 'draft');
+/** an approved / awaiting post whose content edit sends it back through approval */
+const reApproval = computed(() => !!editing.value && ['ready_for_approval', 'approved'].includes(editing.value.status));
 
 function defaultWhen() {
   const t = new Date(Date.now() + 2 * 3600_000);
@@ -70,12 +80,10 @@ function defaultWhen() {
 }
 defaultWhen();
 
-// kinds every selected platform supports (same content goes to all of them)
-const kindOptions = computed(() => {
-  const plats = platforms.value.length ? platforms.value : [...new Set(accounts.value.map(a => a.platform))];
-  let kinds: PostKind[] = [...POST_KINDS];
-  if (plats.length) kinds = POST_KINDS.filter(k => (platforms.value.length ? plats.every(p => PLATFORM_SPECS[p].kinds.includes(k)) : plats.some(p => PLATFORM_SPECS[p].kinds.includes(k))));
-  return kinds;
+// every kind at least one of the brand's accounts can take; accounts that can't take the chosen one sit it out
+const kindOptions = computed<PostKind[]>(() => {
+  const kinds = POST_KINDS.filter(k => accounts.value.some(a => supports(a, k)));
+  return kinds.length ? kinds : [...POST_KINDS];
 });
 watch(kindOptions, ks => { if (ks.length && !ks.includes(kind.value) && !restoring) kind.value = ks[0]; });
 const multi = computed(() => kind.value === 'carousel');
@@ -93,6 +101,7 @@ async function loadFromRoute() {
   const qb = typeof route.query.brand === 'string' ? route.query.brand : null;
   const qm = typeof route.query.media === 'string' ? route.query.media : null;
   if (postId) {
+    if (editing.value?.id === postId && !loadError.value) return; // just saved here — already showing it
     loadingPost.value = true;
     try {
       const p = await api('posts.get', { id: postId });
@@ -100,11 +109,13 @@ async function loadFromRoute() {
       editing.value = p;
       brandId.value = p.brandId;
       await loadAccounts(p.brandId);
-      accountIds.value = [...p.accountIds];
+      picked.value = [...p.accountIds];
       kind.value = p.kind;
       caption.value = p.caption;
       perPlatform.value = JSON.parse(JSON.stringify(p.perPlatform ?? {}));
-      if (p.scheduledAt) { const s = splitWall(p.scheduledAt); day.value = s.day; time.value = s.time; when.value = 'schedule'; }
+      // a time that has passed (failed / stuck posts) is not offered back: two hours from now instead
+      if (p.scheduledAt && (new Date(p.scheduledAt).getTime() > Date.now() + 60_000 || !EDITABLE.includes(p.status))) { const s = splitWall(p.scheduledAt); day.value = s.day; time.value = s.time; when.value = 'schedule'; }
+      else { defaultWhen(); when.value = p.scheduledAt ? 'schedule' : 'queue'; }
       assets.value = [];
       if (p.assetIds.length) {
         try {
@@ -121,7 +132,12 @@ async function loadFromRoute() {
     }
     return;
   }
-  editing.value = null;
+  if (editing.value) {
+    // from a saved post to a new one: start clean (same brand keeps its default accounts)
+    editing.value = null;
+    assets.value = []; caption.value = ''; perPlatform.value = {}; when.value = 'queue'; defaultWhen();
+    picked.value = accounts.value.filter(a => a.loginState !== 'expired').map(a => a.id);
+  }
   if (qb) brandId.value = qb;
   else if (!brandId.value && brands.list.length === 1) brandId.value = brands.list[0].id;
   if (qm) {
@@ -138,11 +154,11 @@ async function loadAccounts(id: string) {
 }
 watch(brandId, async id => {
   if (restoring) return;
-  accounts.value = []; accountIds.value = [];
+  accounts.value = []; picked.value = [];
   if (!id) return;
   await loadAccounts(id);
   if (brandId.value !== id) return;
-  accountIds.value = accounts.value.filter(a => a.loginState !== 'expired').map(a => a.id);
+  picked.value = accounts.value.filter(a => a.loginState !== 'expired').map(a => a.id);
 });
 watch(() => brands.loaded, l => { if (l && !brandId.value && !route.query.post && brands.list.length === 1) brandId.value = brands.list[0].id; });
 onMounted(loadFromRoute);
@@ -273,20 +289,22 @@ const scheduledIso = computed(() => (day.value && time.value ? fromWall(day.valu
 const errors = computed(() => {
   const e: string[] = [];
   if (!brandId.value) e.push('Choose a brand');
-  else if (!accountIds.value.length) e.push('Choose at least one account');
-  if (kind.value !== 'text' && !assets.value.length) e.push('Attach media');
-  if (!kindOptions.value.includes(kind.value)) e.push('These accounts share no post type — choose fewer');
+  else if (!accounts.value.length && !accountsLoading.value) e.push('Add an account to this brand');
+  else if (!accountIds.value.length) e.push(picked.value.some(id => unavailable.value[id]) ? `None of the ticked accounts take ${KIND_LABEL[kind.value].toLowerCase()} posts — choose another type` : 'Choose at least one account');
+  if (kind.value === 'carousel' && assets.value.length < 2) e.push(assets.value.length ? 'Add at least one more file' : 'Attach at least 2 files');
+  else if (kind.value !== 'text' && !assets.value.length) e.push('Attach media');
   return e;
 });
 const scheduleError = computed(() => {
   if (when.value !== 'schedule') return null;
   if (!scheduledIso.value) return 'Pick a date and time';
-  if (new Date(scheduledIso.value).getTime() < Date.now() + 60_000) return 'That time has passed';
+  if (new Date(scheduledIso.value).getTime() < Date.now() + 60_000) return 'That time has passed — pick a later one, or use Queue or Now';
   return null;
 });
 const submitting = ref<string | null>(null);
 const approvalNote = computed(() => !!brand.value?.approvalRequired);
-const primaryLabel = computed(() => (editing.value && !isDraftEdit.value ? 'Save changes' : when.value === 'queue' ? 'Add to queue' : when.value === 'schedule' ? 'Schedule' : approvalNote.value ? 'Prepare now' : 'Post now'));
+const retrying = computed(() => !!editing.value && RETRYABLE.includes(editing.value.status));
+const primaryLabel = computed(() => (retrying.value ? 'Save and send again' : editing.value && !isDraftEdit.value ? 'Save changes' : when.value === 'queue' ? 'Add to queue' : when.value === 'schedule' ? 'Schedule' : approvalNote.value ? 'Prepare now' : 'Post now'));
 
 function payload() {
   return { accountIds: accountIds.value, kind: kind.value, assetIds: kind.value === 'text' ? [] : assets.value.map(a => a.id), caption: caption.value, perPlatform: cleanPerPlatform() };
@@ -304,7 +322,7 @@ async function saveDraft() {
       const p = await api('posts.create', { brandId: brandId.value, ...payload(), scheduledAt: when.value === 'schedule' ? scheduledIso.value : null, mode: 'draft' });
       editing.value = p;
       void router.replace({ path: '/compose', query: { post: p.id } });
-      ok('Draft saved', 'Find it in the calendar list or keep editing here.');
+      ok('Draft saved', p.scheduledAt ? 'It is on the calendar — keep editing here any time.' : 'It is under Not scheduled in the Calendar — keep editing here any time.');
     }
     snapshot();
   } catch (e) {
@@ -323,9 +341,15 @@ async function submit() {
   try {
     const old = editing.value;
     if (old && !isDraftEdit.value) {
-      // an existing queued/scheduled post: save the content and the new time
-      editing.value = await api('posts.update', { id: old.id, patch: { ...payload(), scheduledAt: when.value === 'schedule' ? scheduledIso.value : old.scheduledAt } });
-      ok('Changes saved');
+      // an existing post: save the content and the time the When panel says
+      const at = when.value === 'schedule' ? scheduledIso.value : when.value === 'now' ? new Date().toISOString() : (nextSlot.value ?? old.scheduledAt);
+      let p = await api('posts.update', { id: old.id, patch: { ...payload(), scheduledAt: at } });
+      if (p.status === 'draft') {
+        // the edit dropped its approval / failure: send it on its way again (prepared again when the brand needs approval)
+        p = await api('posts.submit', { id: p.id, mode: when.value, scheduledAt: when.value === 'schedule' ? scheduledIso.value : null });
+        toast(approvalNote.value ? 'Saved — preparing it again for approval' : 'Saved and back in the queue', { tone: 'good', body: approvalNote.value ? 'It will be filled in the brand window again and wait in Approvals.' : p.scheduledAt ? `Goes out ${fmtWhen(p.scheduledAt)}.` : undefined });
+      } else ok('Changes saved', p.scheduledAt ? `Goes out ${fmtWhen(p.scheduledAt)}` : undefined);
+      editing.value = p;
       snapshot();
       return;
     }
@@ -336,7 +360,7 @@ async function submit() {
     const whenText = when.value === 'schedule' ? `Scheduled for ${fmtWhen(p.scheduledAt)}.` : when.value === 'queue' ? (p.scheduledAt ? `Queued for ${fmtWhen(p.scheduledAt)}.` : 'Queued for the next free slot.') : 'Going out as soon as pacing allows.';
     toast(when.value === 'now' ? (approvalNote.value ? 'Preparing in the brand window' : 'Posting now') : when.value === 'queue' ? 'Added to the queue' : 'Scheduled', {
       tone: 'good',
-      body: approvalNote.value ? `It will be prepared in ${brand.value?.name}'s window and wait in Approvals. ${when.value === 'now' ? '' : whenText}` : whenText,
+      body: approvalNote.value ? `It will be filled in the brand window first and wait in Approvals.${when.value === 'now' ? '' : ` ${whenText}`}` : whenText,
       action: { label: approvalNote.value ? 'Approvals' : 'Calendar', run: () => void router.push(approvalNote.value ? '/approvals' : '/calendar') }
     });
     resetContent();
@@ -366,15 +390,20 @@ async function deletePost() {
 
 // ── leave guard ──────────────────────────────────────────────────────────────
 const snap = ref('');
-const state = () => JSON.stringify([brandId.value, accountIds.value, kind.value, assets.value.map(a => a.id), caption.value, perPlatform.value, when.value, day.value, time.value]);
+const state = () => JSON.stringify([brandId.value, picked.value, kind.value, assets.value.map(a => a.id), caption.value, perPlatform.value, when.value, day.value, time.value]);
 function snapshot() { snap.value = state(); }
 const dirty = computed(() => state() !== snap.value && (caption.value.trim() !== '' || assets.value.length > 0));
-onBeforeRouteLeave(async () => {
+const guard = async () => {
   if (!dirty.value || submitting.value) return true;
   return await confirm({ title: 'Leave without saving?', body: 'This post has changes that are not saved.', confirm: 'Discard changes', cancel: 'Keep editing', danger: true });
-});
+};
+onBeforeRouteLeave(guard);
+// switching post inside the composer (Start a new post, a link to another ?post=) is leaving too
+onBeforeRouteUpdate(guard);
 
-useShortcuts({ 'mod+Enter': () => void submit(), 'mod+s': () => void saveDraft() });
+// not while a drawer / modal (media picker, duplicate, confirm) is on top
+const overlayOpen = () => !!document.querySelector('[role="dialog"][aria-modal="true"]');
+useShortcuts({ 'mod+Enter': () => { if (!overlayOpen()) void submit(); }, 'mod+s': () => { if (!overlayOpen()) void saveDraft(); } });
 
 const dupOpen = ref(false);
 const menu = computed<MenuItem[]>(() => [
@@ -386,6 +415,42 @@ const menu = computed<MenuItem[]>(() => [
 const whenOptions = [{ value: 'queue', label: 'Queue', icon: 'queue' }, { value: 'schedule', label: 'Schedule', icon: 'calendar' }, { value: 'now', label: 'Now', icon: 'bolt' }];
 const kindSegments = computed(() => kindOptions.value.map(k => ({ value: k, label: KIND_LABEL[k] })));
 const todayWall = computed(() => splitWall(new Date()).day);
+
+// ── read-only posts (running / posted / cancelled): what happened, instead of the When panel ──
+const results = computed(() => (editing.value?.results ?? []).map(r => ({ ...r, acc: accounts.value.find(a => a.id === r.accountId) })));
+const openUrl = (url: string) => void api('app.openExternal', { url }).catch(e => fail(e, 'Could not open the link'));
+const stopping = ref(false);
+async function stopPost() {
+  const p = editing.value; if (!p) return;
+  if (!(await confirm({ title: 'Stop this post?', body: 'Cubby stops working in the brand window and marks the post cancelled. Accounts already posted stay posted.', confirm: 'Stop post', cancel: 'Keep going', danger: true }))) return;
+  stopping.value = true;
+  try { editing.value = await api('posts.cancel', { id: p.id }); ok('Post stopped'); snapshot(); }
+  catch (e) { fail(e, 'Could not stop the post'); }
+  finally { stopping.value = false; }
+}
+const openingBrand = ref(false);
+async function openBrand() {
+  const id = editing.value?.brandId; if (!id) return;
+  openingBrand.value = true;
+  try { await api('brands.open', { id }); await api('brands.front', { id }).catch(() => {}); }
+  catch (e) { fail(e, 'Could not open the brand'); }
+  finally { openingBrand.value = false; }
+}
+// the post can move on its own (prepare finishing, the scheduler running it): keep its status, error and results live
+let liveSeq = 0;
+const offLive = on('posts.changed', async e => {
+  const cur = editing.value;
+  if (!cur || (e?.id && e.id !== cur.id) || submitting.value) return;
+  const my = ++liveSeq;
+  try {
+    const p = await api('posts.get', { id: cur.id });
+    if (my !== liveSeq || editing.value?.id !== p.id) return;
+    if (p.status !== cur.status || p.error !== cur.error || p.updatedAt !== cur.updatedAt) editing.value = p;
+  } catch { /* deleted elsewhere — the next save says so */ }
+});
+onBeforeUnmount(offLive);
+const errTone = computed(() => (!editing.value?.error ? null : ['failed', 'needs_human'].includes(editing.value.status) ? 'bad' : 'warn'));
+const leftOutText = computed(() => leftOut.value.map(a => `${a.handle} (${PLATFORM_SPECS[a.platform]?.name ?? a.platform})`).join(', '));
 </script>
 
 <template>
@@ -398,7 +463,7 @@ const todayWall = computed(() => splitWall(new Date()).day);
       <span v-else>One post, any of the brand’s accounts. Times are {{ tzLabel() }}.</span>
       <template #actions>
         <span v-if="dirty" class="tiny muted unsaved">Unsaved</span>
-        <Menu :items="menu"><Btn icon="more" square aria-label="More" title="More" /></Menu>
+        <Menu v-if="!loadError && (!brands.loaded || brands.list.length)" :items="menu"><Btn icon="more" square aria-label="More" title="More" /></Menu>
       </template>
     </PageHeader>
 
@@ -410,26 +475,33 @@ const todayWall = computed(() => splitWall(new Date()).day);
     </EmptyState>
 
     <div v-else class="cw" :class="{ busy: loadingPost }">
-      <div v-if="readOnly" class="banner small"><Icon name="lock" :size="14" />This post is {{ postStatus(editing!.status).label.toLowerCase() }} — it can no longer be edited. Duplicate it to reuse the content.</div>
+      <div v-if="readOnly" class="banner small"><Icon name="lock" :size="14" /><span>This post is {{ postStatus(editing!.status).label.toLowerCase() }} — it can no longer be edited. Duplicate it to reuse the content.</span></div>
+      <div v-if="editing?.error" class="errbox small" :class="errTone" role="status">
+        <Icon name="warn" :size="14" /><span class="grow">{{ editing.error }}</span>
+        <button v-if="editing.status === 'needs_human'" type="button" class="link small nowrap" :disabled="openingBrand" @click="openBrand">Open the brand window</button>
+      </div>
       <div class="cgrid">
-        <div class="maincol">
+        <fieldset class="maincol" :disabled="readOnly">
           <section class="blk">
             <div class="bh"><span class="n">1</span><h2 class="h3">Brand and accounts</h2></div>
             <div class="brandrow">
-              <div class="bp"><BrandPicker v-model="brandId" placeholder="Choose a brand…" /></div>
-              <span v-if="brand?.approvalRequired" class="tiny muted row gap-1"><Icon name="approve" :size="13" />Needs approval</span>
+              <div class="bp"><BrandPicker v-model="brandId" placeholder="Choose a brand…" :disabled="!!editing" /></div>
+              <span v-if="brand?.approvalRequired" class="tiny muted row gap-1 nowrap"><Icon name="approve" :size="13" />Needs approval</span>
             </div>
+            <p v-if="editing && !readOnly" class="tiny muted mt-2">A post stays in its brand — use Duplicate to brand… in the ⋯ menu to post it elsewhere.</p>
             <div v-if="brandId" class="mt-3">
               <div v-if="accountsLoading" class="row gap-2"><span v-for="i in 3" :key="i" class="skel" style="width: 130px; height: 36px; border-radius: 99px" /></div>
               <p v-else-if="!accounts.length" class="small muted">This brand has no accounts yet. <RouterLink :to="`/brands/${brandId}`" class="link">Add them on the brand page</RouterLink>.</p>
-              <AccountChips v-else v-model="accountIds" :accounts="accounts" :disabled="readOnly" />
+              <template v-else>
+                <AccountChips v-model="picked" :accounts="accounts" :unavailable="unavailable" />
+                <p v-if="leftOut.length" class="tiny muted mt-2 leftout">Not for {{ KIND_LABEL[kind].toLowerCase() }} posts: {{ leftOutText }}.</p>
+              </template>
             </div>
           </section>
 
           <section class="blk">
             <div class="bh"><span class="n">2</span><h2 class="h3">Post type</h2></div>
-            <Segmented v-if="kindSegments.length" v-model="kind" :options="kindSegments" />
-            <p v-else class="small muted">The selected accounts share no post type — unselect one.</p>
+            <Segmented v-model="kind" :options="kindSegments" />
           </section>
 
           <section v-if="kind !== 'text'" class="blk">
@@ -441,10 +513,10 @@ const todayWall = computed(() => splitWall(new Date()).day);
             <div class="bh"><span class="n">{{ kind === 'text' ? 3 : 4 }}</span><h2 class="h3">Caption</h2></div>
             <textarea v-model="caption" v-autosize class="textarea cap" rows="5" data-max="420" placeholder="Write the caption. #hashtags count toward each platform’s limit." :disabled="readOnly" aria-label="Caption" />
             <div v-if="counters.length" class="counters">
-              <span v-for="c in counters" :key="c.p" class="ctr" :class="{ over: c.len > c.max || c.tags > c.tagMax }" :title="c.override ? `${c.name} uses its own caption` : undefined">
+              <span v-for="c in counters" :key="c.p" class="ctr" :class="{ over: c.len > c.max || c.tags > c.tagMax }" :title="`${c.name}: ${c.len.toLocaleString()} of ${c.max.toLocaleString()} characters, ${c.tags} of ${c.tagMax} hashtags${c.override ? ' — uses its own caption' : ''}`">
                 <PlatformIcon :platform="c.p" :size="12" />
                 <span class="num">{{ c.len.toLocaleString() }}/{{ c.max.toLocaleString() }}</span>
-                <span class="num faint">#{{ c.tags }}/{{ c.tagMax }}</span>
+                <span class="num tags">#{{ c.tags }}/{{ c.tagMax }}</span>
                 <span v-if="c.override" class="ov">own</span>
               </span>
             </div>
@@ -457,10 +529,33 @@ const todayWall = computed(() => splitWall(new Date()).day);
               </div>
             </div>
           </section>
-        </div>
+        </fieldset>
 
         <aside class="side">
-          <div class="panel pad actions">
+          <div v-if="readOnly && editing" class="panel pad outcome">
+            <div class="label mb-3">{{ editing.status === 'running' ? 'Working on it' : editing.status === 'posted' ? 'Posted' : 'Outcome' }}</div>
+            <div class="row gap-2 wrap"><Chip :tone="postStatus(editing.status).tone">{{ postStatus(editing.status).label }}</Chip><span class="small muted">{{ editing.scheduledAt ? fmtWhen(editing.scheduledAt) : 'No time set' }}</span></div>
+            <p v-if="editing.status === 'running'" class="small mt-3">Cubby is working on this post in {{ brand?.name ?? 'the brand' }}’s window right now. The calendar and this page update when it finishes.</p>
+            <p v-else-if="editing.status === 'cancelled'" class="small muted mt-3">It was cancelled and will not go out.</p>
+            <ul v-if="results.length" class="results mt-3">
+              <li v-for="r in results" :key="r.accountId">
+                <PlatformIcon :platform="r.acc?.platform ?? 'custom'" :size="14" colored />
+                <div class="grow minw">
+                  <div class="small strong ellipsis" :title="r.acc?.handle">{{ r.acc?.handle ?? 'removed account' }}</div>
+                  <div v-if="r.error" class="tiny bad clamp2" :title="r.error">{{ errorFor(r.error, r.acc) }}</div>
+                  <div v-else class="tiny muted">Posted {{ ago(r.at) }}</div>
+                </div>
+                <Btn v-if="r.url" size="sm" variant="ghost" icon="external" @click="openUrl(r.url)">View post</Btn>
+              </li>
+            </ul>
+            <div class="btns">
+              <Btn v-if="editing.status === 'running'" block variant="danger" icon="stop" :loading="stopping" @click="stopPost">Stop post</Btn>
+              <Btn block icon="copy" @click="dupOpen = true">Duplicate to brand…</Btn>
+              <Btn block variant="subtle" icon="plus" :to="{ path: '/compose', query: { brand: editing.brandId } }">Start a new post</Btn>
+            </div>
+          </div>
+
+          <div v-else class="panel pad actions">
             <div class="label mb-3">When</div>
             <Segmented v-model="when" :options="whenOptions" size="sm" />
             <div class="whenbody">
@@ -488,13 +583,15 @@ const todayWall = computed(() => splitWall(new Date()).day);
               <Btn variant="signal" block :loading="submitting === 'submit'" :disabled="readOnly || !!errors.length || !!scheduleError" :title="errors[0] ?? scheduleError ?? undefined" @click="submit">{{ primaryLabel }}</Btn>
               <Btn block :loading="submitting === 'draft'" :disabled="readOnly || (!!editing && !isDraftEdit)" @click="saveDraft">{{ isDraftEdit ? 'Save draft' : 'Save as draft' }}</Btn>
             </div>
-            <ul v-if="errors.length && !readOnly" class="todo tiny">
-              <li v-for="e in errors" :key="e"><Icon name="info" :size="12" />{{ e }}</li>
+            <ul v-if="errors.length" class="todo tiny">
+              <li v-for="e in errors" :key="e"><Icon name="info" :size="12" /><span>{{ e }}</span></li>
             </ul>
-            <p class="tiny faint keys mt-2"><kbd>Ctrl</kbd> <kbd>Enter</kbd> {{ primaryLabel.toLowerCase() }} · <kbd>Ctrl</kbd> <kbd>S</kbd> draft</p>
+            <p v-if="reApproval" class="tiny muted mt-2">Changing the content sends it back for approval; changing only the time keeps the approval.</p>
+            <p v-else-if="retrying" class="tiny muted mt-2">{{ approvalNote ? 'Saving prepares it again in the brand window for approval.' : 'Saving puts it back in the queue at the time above; accounts already posted are skipped.' }}</p>
+            <p class="tiny muted keys mt-2"><kbd>Ctrl</kbd> <kbd>Enter</kbd> {{ primaryLabel.toLowerCase() }}<template v-if="!editing || isDraftEdit"> · <kbd>Ctrl</kbd> <kbd>S</kbd> draft</template></p>
           </div>
 
-          <div class="panel pad">
+          <div v-if="!readOnly" class="panel pad">
             <FitPanel :rows="fitRows" :checking="fitChecking" :local="fitLocal" :empty="brandId ? 'Choose accounts to check the post against each platform.' : 'Choose a brand to start.'" />
           </div>
 
@@ -526,7 +623,21 @@ const todayWall = computed(() => splitWall(new Date()).day);
   .side { position: sticky; top: calc(var(--topbar) + 20px); }
 }
 @container (min-width: 1120px) { .cgrid { grid-template-columns: minmax(0, 1fr) 360px; gap: var(--s6); } }
-.maincol { display: flex; flex-direction: column; gap: var(--s6); min-width: 0; }
+.maincol { display: flex; flex-direction: column; gap: var(--s6); min-width: 0; margin: 0; padding: 0; border: 0; }
+.maincol:disabled .blk { opacity: .78; }
+.errbox { display: flex; gap: 8px; align-items: flex-start; padding: 10px 14px; margin-bottom: var(--s5); border-radius: var(--r-lg); line-height: 1.45; overflow-wrap: anywhere; }
+.errbox .icon { margin-top: 2px; flex: none; }
+.errbox.bad { background: var(--bad-bg); color: var(--bad); }
+.errbox.warn { background: var(--warn-bg); color: var(--warn); }
+.leftout { line-height: 1.45; }
+.ctr .tags { color: var(--muted); }
+.ctr.over .tags { color: inherit; }
+.results li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line-soft); }
+.results li:first-child { border-top: 0; padding-top: 0; }
+.results .icon, .results .pi { flex: none; }
+.minw { min-width: 0; }
+.bad { color: var(--bad); }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .side { display: flex; flex-direction: column; gap: var(--s4); min-width: 0; }
 .blk { min-width: 0; }
 .bh { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }

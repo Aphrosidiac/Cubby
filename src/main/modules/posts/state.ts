@@ -101,6 +101,17 @@ export function transitionError(from: PostStatus, ev: PostEvent): string {
   return `This post is ${LABEL[from]} and can't be ${VERB[ev]} now.`
 }
 
+/**
+ * Saving a post whose content didn't change: a new time is a reschedule where the table allows it;
+ * a failed or stuck post (no reschedule) starts over like an edit (back to draft, approval and
+ * error dropped) so it can be sent again.
+ */
+export function timeChangeEvent(from: PostStatus): 'reschedule' | 'edit' | null {
+  if (canDo(from, 'reschedule')) return 'reschedule'
+  if (canDo(from, 'edit')) return 'edit'
+  return null
+}
+
 /** Where a finished prepare lands. */
 export function afterPrepare(origin: PostStatus, approvalRequired: boolean): PostEvent {
   if (approvalRequired) return 'prepared'

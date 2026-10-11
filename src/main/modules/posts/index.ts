@@ -25,7 +25,7 @@ import { parseHhmm, safeTz, slotTimes } from '../scheduler/time'
 import { captionFor, captionProblems, fitPost } from './fit'
 import { casStatus, deletePostRow, findPost, getPost, insertPost, listPosts, listSlots, replaceSlots, savePost } from './repo'
 import { pickSlot } from './slots'
-import { ACTIVE, afterPrepare, canDo, DUE, initialStatus, nextStatus, runOutcome, transitionError, type PostEvent, type RunTally } from './state'
+import { ACTIVE, afterPrepare, canDo, DUE, initialStatus, nextStatus, runOutcome, timeChangeEvent, transitionError, type PostEvent, type RunTally } from './state'
 
 export { getPost, listPosts } from './repo'
 
@@ -125,7 +125,10 @@ function validateContent(c: Content, opts: { needMedia: boolean; strictCaption?:
 type RecipeOutcome = { kind: 'ok'; result: RecipeResult | undefined; run: FlowRun } | { kind: 'failed' | 'needs_human'; message: string; run: FlowRun | null }
 
 function classify(e: unknown, run: FlowRun | null, label: string): RecipeOutcome {
-  const message = `${label}: ${errMsg(e ?? run?.error ?? 'the run did not finish')}`
+  // "X @ffdev: X: could not confirm…" → "X @ffdev: could not confirm…" (recipes prefix their platform too)
+  const raw = errMsg(e ?? run?.error ?? 'the run did not finish')
+  const platform = label.split(' @')[0]
+  const message = `${label}: ${raw.startsWith(`${platform}: `) ? raw.slice(platform.length + 2) : raw}`
   const human = (e instanceof GuardrailError && e.rule !== 'kill_switch') || run?.status === 'needs_human'
   return { kind: human ? 'needs_human' : 'failed', message, run }
 }
@@ -433,9 +436,11 @@ implement({
     const contentChanged = !same(next.accountIds, p.accountIds) || next.kind !== p.kind || !same(next.assetIds, p.assetIds) || next.caption !== p.caption || !same(next.perPlatform, p.perPlatform)
     if (!contentChanged) {
       // only the time moved: same as reschedule (approval kept)
-      if (scheduledAt === p.scheduledAt) return p
-      if (!canDo(p.status, 'reschedule')) throw new UserError(transitionError(p.status, 'reschedule'), 'conflict')
-      return move(p, 'reschedule', { scheduledAt })
+      const ev = timeChangeEvent(p.status)
+      // failed / needs a person: saving it (new time or not) starts it over like an edit (below)
+      if (ev !== 'edit' && scheduledAt === p.scheduledAt) return p
+      if (!ev) throw new UserError(transitionError(p.status, 'reschedule'), 'conflict')
+      if (ev === 'reschedule') return move(p, 'reschedule', { scheduledAt })
     }
     if (!canDo(p.status, 'edit')) throw new UserError(transitionError(p.status, 'edit'), 'conflict')
     const willRun = nextStatus(p.status, 'edit') === 'queued'
