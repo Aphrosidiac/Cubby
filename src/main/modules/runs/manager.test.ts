@@ -225,4 +225,16 @@ describe('run manager', () => {
     expect(listRuns({ brandId: 'br_2', status: 'failed' }).some((x) => x.id === 'run_stale')).toBe(true)
     expect(listRuns({ limit: 3 })).toHaveLength(3)
   })
+
+  it('aborting a row left "running" with nothing behind it closes it as aborted', () => {
+    db.run("INSERT INTO runs (id, brand_id, actor, label, status, started_at, log) VALUES ('run_orphan', 'br_2', 'scheduler', 'orphan', 'running', '2026-10-01T00:00:00Z', '[]')")
+    expect(abortRun('run_orphan')).toBe(true)
+    const r = getRun('run_orphan')
+    expect(r.status).toBe('aborted')
+    expect(r.error).toBe('Stopped by you')
+    expect(r.endedAt).toBeTruthy()
+    expect(r.log.at(-1)?.msg).toMatch(/no longer running/)
+    expect(abortRun('run_orphan')).toBe(false)
+    expect(abortRun('run_nope')).toBe(false)
+  })
 })

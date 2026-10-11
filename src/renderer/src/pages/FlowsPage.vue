@@ -179,14 +179,18 @@ const tabs = computed(() => [
         <EmptyState v-else-if="!recipes.data.value?.length" icon="bolt" title="No recipes installed" />
         <div v-else class="rgrid">
           <article v-for="r in recipes.data.value" :key="r.id" class="recipe">
-            <div class="row gap-2">
+            <div class="row">
               <span class="ric"><PlatformIcon v-if="r.platform" :platform="r.platform" :size="16" colored /><Icon v-else name="bolt" :size="16" /></span>
-              <h3 class="h3 grow ellipsis">{{ r.name }}</h3>
+              <div class="grow rhead">
+                <h3 class="h3 ellipsis" :title="r.name">{{ r.name }}</h3>
+                <div class="tiny muted ellipsis" :title="kindsText(r)">{{ kindsText(r) }}</div>
+              </div>
             </div>
             <p class="small muted desc">{{ r.description }}</p>
-            <div class="row between">
-              <span class="tiny muted">{{ kindsText(r) }}</span>
-              <Btn v-if="isPosting(r)" size="sm" variant="ghost" icon="compose" to="/compose" title="Posting recipes run from a post in the composer">From composer</Btn>
+            <div class="row rfoot">
+              <span v-if="isPosting(r)" class="tiny muted">Runs from a post</span>
+              <span class="grow" />
+              <Btn v-if="isPosting(r)" size="sm" variant="ghost" icon="compose" to="/compose" title="Posting recipes need a post — write one in the composer and it runs this recipe">Open composer</Btn>
               <Btn v-else size="sm" icon="play" @click="runTarget = { kind: 'recipe', recipe: r }">Run on brand…</Btn>
             </div>
           </article>
@@ -197,7 +201,7 @@ const tabs = computed(() => [
       <template v-else>
         <EmptyState v-if="runs.error.value && !runs.data.value" icon="warn" title="Run history isn’t available yet" :body="runs.error.value"><Btn size="sm" icon="refresh" @click="runs.reload()">Try again</Btn></EmptyState>
         <DataTable v-else :columns="runCols" :rows="runs.data.value" :loading="runs.loading.value" dense @row-click="r => router.push(`/runs/${r.id}`)">
-          <template #cell-label="{ row }"><div class="ellipsis strongish" :title="row.label">{{ row.label }}</div><div v-if="row.error" class="tiny bad ellipsis" :title="row.error">{{ row.error }}</div></template>
+          <template #cell-label="{ row }"><div class="ellipsis strongish" :title="row.label">{{ row.label }}</div><div v-if="row.error" class="tiny ellipsis" :class="row.status === 'needs_human' ? 'warnt' : row.status === 'aborted' ? 'muted' : 'bad'" :title="row.error">{{ row.error }}</div></template>
           <template #cell-brandId="{ row }"><span class="row gap-2"><BrandAvatar :brand="brandOrStub(row.brandId)" :size="18" /><span class="small ellipsis" :title="brandName(row.brandId)">{{ brandName(row.brandId) }}</span></span></template>
           <template #cell-actor="{ row }"><ActorChip :actor="row.actor" /></template>
           <template #cell-status="{ row }"><Chip size="sm" :tone="runStatus(row.status).tone">{{ runStatus(row.status).label }}</Chip></template>
@@ -208,7 +212,7 @@ const tabs = computed(() => [
       </template>
     </div>
 
-    <RunBrandModal :open="!!runTarget" :title="runTarget?.kind === 'flow' ? `Run “${runTarget.flow.name}”` : `Run ${runTarget?.recipe.name ?? ''}`"
+    <RunBrandModal :open="!!runTarget" :title="runTarget?.kind === 'flow' ? `Run “${runTarget.flow.name}”` : `Run “${runTarget?.recipe.name ?? ''}”`"
       :multi="runTarget?.kind === 'flow' && runTarget.flow.brandScope !== 'one'" :limit-to="runTarget?.kind === 'flow' && runTarget.flow.brandScope !== 'any' ? runTarget.flow.brandIds : null"
       :busy="running" @update:open="v => !v && (runTarget = null)" @confirm="confirmRun" />
   </div>
@@ -235,5 +239,10 @@ const tabs = computed(() => [
 .desc { flex: 1; line-height: 1.45; }
 .strongish { font-weight: 500; }
 .bad { color: var(--bad); }
+.warnt { color: var(--warn); }
+.rhead { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rfoot { gap: 10px; }
+/* menus in the last rows must not be clipped by the table's scroll box (columns fold before it could overflow) */
+.flows :deep(.ff-table) { overflow: visible; }
 .mt-1 { margin-top: 2px; }
 </style>
