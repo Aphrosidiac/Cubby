@@ -17,7 +17,7 @@ import { confirm } from '@/composables/confirm';
 import { fail, ok } from '@/composables/toast';
 
 /** Approval default, quiet hours, catch-up, and the pacing table (platform × account age). */
-const { form, dirty, busy, save, discard } = useSection(['approvalDefault', 'quietHours', 'catchUp']);
+const { form, dirty, busy, save, discard } = useSection(['approvalDefault', 'quietHours', 'catchUp'], { alsoDirty: () => rulesDirty.value });
 
 const rules = useLoad(() => api('pacing.rules'));
 const edit = ref<PacingRule[]>([]);
@@ -29,13 +29,14 @@ const cell = (p: Platform, t: AgeTier) => edit.value.find(r => r.platform === p 
 const bad = computed(() => edit.value.some(r => !(r.minGapMin >= 0) || !(r.dailyMax >= 1) || !(r.jitterMin >= 0)));
 const savingRules = ref(false);
 async function saveAll() {
-  if (dirty.value) await save('Posting settings saved');
+  const both = dirty.value && rulesDirty.value;
+  if (dirty.value && !(await save(both ? null : 'Posting settings saved'))) return;
   if (rulesDirty.value && !bad.value) {
     savingRules.value = true;
     try {
       const r = await api('pacing.setRules', { rules: edit.value.map(x => ({ ...x, minGapMin: Number(x.minGapMin), dailyMax: Math.round(Number(x.dailyMax)), jitterMin: Number(x.jitterMin) })) });
       edit.value = JSON.parse(JSON.stringify(r)); base.value = JSON.stringify(r);
-      ok('Pacing rules saved');
+      ok(both ? 'Posting settings saved' : 'Pacing rules saved');
     } catch (e) { fail(e, 'Could not save pacing rules'); } finally { savingRules.value = false; }
   }
 }
@@ -56,7 +57,7 @@ async function reset() {
       <div class="set-l"><span class="t">Quiet hours</span><span class="d">Nothing is published in this window; due posts wait until it ends.</span></div>
       <div class="set-c">
         <Toggle v-model="form.quietHours.enabled" label="Hold posts during quiet hours" />
-        <div v-if="form.quietHours.enabled" class="set-pair"><span class="small muted">From</span><input v-model="form.quietHours.start" type="time" class="input t" /><span class="small muted">to</span><input v-model="form.quietHours.end" type="time" class="input t" /></div>
+        <div v-if="form.quietHours.enabled" class="set-pair"><span class="small muted">From</span><input v-model="form.quietHours.start" type="time" class="input tm" /><span class="small muted">to</span><input v-model="form.quietHours.end" type="time" class="input tm" /></div>
       </div>
     </div>
     <div class="set-row">
@@ -92,7 +93,7 @@ async function reset() {
             </tbody>
           </table>
         </div>
-        <div class="set-pair"><Btn size="sm" variant="subtle" icon="undo" @click="reset">Reset to defaults</Btn><span v-if="bad" class="tiny bad">Gaps and jitter must be 0 or more, max per day at least 1.</span></div>
+        <div class="set-pair"><Btn size="sm" variant="subtle" icon="undo" :disabled="!rules.data.value" @click="reset">Reset to defaults</Btn><span v-if="bad" class="tiny bad">Gaps and jitter must be 0 or more, max per day at least 1.</span></div>
       </div>
     </div>
     <SaveBar :show="dirty || rulesDirty" :busy="busy || savingRules" :disabled="bad" @save="saveAll" @discard="discardAll" />
@@ -100,9 +101,10 @@ async function reset() {
 </template>
 
 <style scoped>
-.t { width: 120px; }
-.wide { grid-template-columns: 200px minmax(0, 1fr); }
-@media (max-width: 1100px) { .wide { grid-template-columns: minmax(0, 1fr); } }
+.tm { width: 148px; }
+/* the pacing table needs the full width: its label sits above it */
+.wide { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.wide .set-l { max-width: 560px; }
 .pt-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); }
 .pt { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-sm); }
 .pt th { font-family: var(--mono); font-size: var(--fs-2xs); font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 8px 6px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--line-soft); }

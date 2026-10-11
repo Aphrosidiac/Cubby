@@ -91,7 +91,7 @@ const showRevoked = ref(false);
             <Btn size="sm" variant="danger" @click="revoke(t)">Revoke</Btn>
           </li>
         </ul>
-        <button v-if="revoked.length" type="button" class="link tiny muted" @click="showRevoked = !showRevoked">{{ showRevoked ? 'Hide' : 'Show' }} {{ revoked.length }} revoked</button>
+        <button v-if="revoked.length" type="button" class="link tiny muted self-start" @click="showRevoked = !showRevoked">{{ showRevoked ? 'Hide' : 'Show' }} {{ revoked.length }} revoked</button>
         <ul v-if="showRevoked && revoked.length" class="tl dim">
           <li v-for="t in revoked" :key="t.id"><span class="small grow">{{ t.name }} <span class="code muted">{{ t.prefix }}…</span></span><span class="tiny muted">revoked {{ ago(t.revokedAt) }}</span></li>
         </ul>
@@ -119,7 +119,7 @@ const showRevoked = ref(false);
           <Segmented v-model="draft.restrict" size="sm" :options="[{ value: 'all', label: 'All brands' }, { value: 'some', label: 'Only some' }]" />
         </Field>
         <ul v-if="draft.restrict === 'some'" class="pick">
-          <li v-for="b in brands.data.value ?? []" :key="b.id"><label><input type="checkbox" :checked="draft.brandIds.has(b.id)" @change="toggleBrand(b.id)" /><BrandAvatar :brand="b" :size="22" /><span>{{ b.name }}</span></label></li>
+          <li v-for="b in brands.data.value ?? []" :key="b.id"><label><input type="checkbox" :checked="draft.brandIds.has(b.id)" @change="toggleBrand(b.id)" /><BrandAvatar :brand="b" :size="22" /><span class="ellipsis" :title="b.name">{{ b.name }}</span></label></li>
         </ul>
         <button type="submit" hidden />
       </form>
@@ -133,6 +133,7 @@ const showRevoked = ref(false);
 
 <style scoped>
 .full { align-items: stretch; }
+.self-start { align-self: flex-start; }
 .urls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 640px; }
 @media (max-width: 1200px) { .urls { grid-template-columns: minmax(0, 1fr); } }
 .bad { color: var(--bad); }

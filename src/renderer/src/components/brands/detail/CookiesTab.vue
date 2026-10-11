@@ -52,7 +52,7 @@ async function doExport() {
     if (!path) return;
     const r = await api('cookies.export', { brandId: props.brand.id, passphrase: p1.value, path });
     exp.value = false; p1.value = ''; p2.value = '';
-    toast(`Exported ${r.count} cookies`, { tone: 'good', body: r.path, action: { label: 'Show file', run: () => void api('app.revealPath', { path: r.path }) } });
+    toast(`Exported ${cookies(r.count)}`, { tone: 'good', body: r.path, action: { label: 'Show file', run: () => void api('app.revealPath', { path: r.path }) } });
   } catch (e) { fail(e, 'Export failed'); } finally { busy.value = null; }
 }
 // ── import ──
@@ -68,37 +68,46 @@ async function doImport() {
     }
     busy.value = 'import';
     const r = await api('cookies.import', { brandId: props.brand.id, path, passphrase });
-    ok(`Imported ${r.count} cookies`, props.brand.status === 'open' ? 'Reload the brand’s tabs to use them.' : undefined);
+    ok(`Imported ${cookies(r.count)}`, props.brand.status === 'open' ? 'Reload the brand’s tabs to use them.' : undefined);
     void list.reload(true);
   } catch (e) { fail(e, 'Import failed'); } finally { busy.value = null; }
 }
 // ── clear per platform ──
-const clearMenu = computed(() => PLATFORMS.filter(p => p !== 'custom').map(p => ({ label: `${PLATFORM_SPECS[p].name}${props.brand.accounts.some(a => a.platform === p) ? '' : ' (no account)'}`, icon: 'trash', danger: true, run: () => void clear(p) })));
+const hasAcc = (p: Platform) => props.brand.accounts.some(a => a.platform === p);
+// the platforms this brand has accounts on first, then the rest
+const clearMenu = computed(() => PLATFORMS.filter(p => p !== 'custom').sort((a, b) => Number(hasAcc(b)) - Number(hasAcc(a))).map(p => ({ label: `${PLATFORM_SPECS[p].name}${hasAcc(p) ? '' : ' (no account)'}`, icon: 'trash', danger: true, run: () => void clear(p) })));
+const binned = computed(() => !!props.brand.deletedAt);
 async function clear(p: Platform) {
   if (!(await confirm({ title: `Clear ${PLATFORM_SPECS[p].name} site data?`, body: `Deletes ${PLATFORM_SPECS[p].name}’s cookies in ${props.brand.name}. You will be logged out there and need to log in again.`, confirm: 'Clear and log out', danger: true }))) return;
   busy.value = `clear-${p}`;
-  try { const r = await api('cookies.clear', { brandId: props.brand.id, platform: p }); ok(`Cleared ${r.count} ${PLATFORM_SPECS[p].name} cookies`); void list.reload(true); } catch (e) { fail(e, 'Could not clear'); } finally { busy.value = null; }
+  try { const r = await api('cookies.clear', { brandId: props.brand.id, platform: p }); ok(`Cleared ${cookies(r.count, PLATFORM_SPECS[p].name)}`); void list.reload(true); } catch (e) { fail(e, 'Could not clear'); } finally { busy.value = null; }
 }
+const cookies = (n: number, what = '') => `${n} ${what ? `${what} ` : ''}cookie${n === 1 ? '' : 's'}`;
 const isPast = (d: string | null) => !!d && new Date(d) < new Date();
 </script>
 
 <template>
   <div>
     <div class="bar">
-      <label class="search"><Icon name="search" :size="14" /><input v-model="q" placeholder="Filter sites or cookie names" /></label>
-      <span class="tiny muted grow">{{ list.data.value ? `${list.data.value.length} cookie${list.data.value.length === 1 ? '' : 's'} across ${sites.length} site${sites.length === 1 ? '' : 's'} · ` : '' }}values are never shown</span>
-      <Btn size="sm" icon="refresh" variant="subtle" :loading="list.refreshing.value && !list.loading.value" @click="wanted ? list.reload(true) : loadNow()">Refresh</Btn>
-      <Btn size="sm" icon="upload" :loading="busy === 'import'" @click="doImport">Import</Btn>
-      <Btn size="sm" icon="download" @click="exp = true">Export</Btn>
-      <Menu :items="clearMenu" :width="230">
-        <Btn size="sm" variant="danger" icon="trash" icon-right="chevron-down">Clear site data</Btn>
+      <template v-if="wanted">
+        <label class="search"><Icon name="search" :size="14" /><input v-model="q" placeholder="Filter sites or cookie names" aria-label="Filter sites or cookie names" /></label>
+        <span class="tiny muted grow num">{{ list.data.value ? `${list.data.value.length} cookie${list.data.value.length === 1 ? '' : 's'} across ${sites.length} site${sites.length === 1 ? '' : 's'} · values are never shown` : '' }}</span>
+        <Btn size="sm" icon="refresh" variant="subtle" :loading="list.refreshing.value && !list.loading.value" @click="list.reload(true)">Refresh</Btn>
+      </template>
+      <span v-else class="grow" />
+      <Btn size="sm" icon="upload" :loading="busy === 'import'" :disabled="binned" @click="doImport">Import</Btn>
+      <Btn size="sm" icon="download" :disabled="binned" @click="exp = true">Export</Btn>
+      <Menu v-if="!binned" :items="clearMenu" :width="230">
+        <Btn size="sm" variant="danger" icon="trash" icon-right="chevron-down" :loading="!!busy?.startsWith('clear-')">Clear site data</Btn>
       </Menu>
+      <Btn v-else size="sm" variant="danger" icon="trash" icon-right="chevron-down" disabled>Clear site data</Btn>
     </div>
 
     <div v-if="!wanted" class="panel closed">
       <Icon name="cookie" :size="20" class="faint" />
-      <div class="grow"><div class="strong small">{{ brand.name }} is closed</div><div class="tiny muted">Reading its cookies opens the brand in the background for a moment, then closes it again.</div></div>
-      <Btn size="sm" icon="refresh" @click="loadNow">Load cookies</Btn>
+      <div v-if="binned" class="grow"><div class="strong small">{{ brand.name }} is in the recycle bin</div><div class="tiny muted">Restore it to read, export or clear its cookies.</div></div>
+      <div v-else class="grow"><div class="strong small ellipsis" :title="`${brand.name} is closed`">{{ brand.name }} is closed</div><div class="tiny muted">Reading its cookies opens the brand in the background for a moment, then closes it again. Values are never shown.</div></div>
+      <Btn v-if="!binned" size="sm" icon="refresh" @click="loadNow">Load cookies</Btn>
     </div>
     <LoadError v-else-if="list.error.value" :error="list.error.value" title="Could not read this brand’s cookies" @retry="list.reload()" />
     <div v-else-if="list.loading.value" class="panel"><div v-for="i in 5" :key="i" class="site"><div class="skel-line" :style="{ width: `${30 + i * 8}%` }" /></div></div>
@@ -143,7 +152,7 @@ const isPast = (d: string | null) => !!d && new Date(d) < new Date();
 <style scoped>
 .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .search { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); width: 240px; }
-.search:focus-within { border-color: var(--focus-border); }
+.search:focus-within { border-color: var(--focus-border); box-shadow: var(--focus-ring); }
 .search input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: var(--fs-sm); color: var(--fg); }
 .search input:focus-visible { box-shadow: none; outline: none; }
 .site-wrap + .site-wrap { border-top: 1px solid var(--line-soft); }
@@ -154,7 +163,11 @@ button.site:hover { background: var(--panel-hover); }
 .exp { min-width: 110px; text-align: right; color: var(--fg-2); }
 .bad { color: var(--bad) !important; }
 .ck { width: 100%; margin: 0 0 8px; }
+.site:active { background: var(--panel-2); }
 .closed { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
-.ck td { padding: 6px 18px 6px 0; border-top: 1px solid var(--line-soft); }
+.closed .grow { min-width: 0; }
+.ck td { padding: 6px 18px 6px 0; border-top: 1px solid var(--line-soft); overflow-wrap: anywhere; }
+.ck td.code { word-break: break-all; }
+.ck td.right { white-space: nowrap; }
 .ck td:first-child { padding-left: 64px; }
 </style>

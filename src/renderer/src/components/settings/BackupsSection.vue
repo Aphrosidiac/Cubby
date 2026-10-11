@@ -68,16 +68,18 @@ async function runNow() {
   } catch (e) { fail(e, 'Backup failed'); } finally { running.value = false; }
 }
 const restoring = ref<string | null>(null);
-async function restore(b: BackupInfo) {
-  const p = await confirm({ title: 'Restore this backup?', body: `${dateTime(b.at)} · ${bytes(b.sizeBytes)}\nBrands that aren’t on this computer are added back with their profiles. Brands you already have are left as they are.`, confirm: 'Restore', input: { label: 'Backup passphrase', password: true } });
+/** b = a listed backup, or only a path picked from disk (then its file name stands in for date and size) */
+async function restore(b: BackupInfo | { path: string }) {
+  const what = 'at' in b ? `${dateTime(b.at)} · ${bytes(b.sizeBytes)}` : b.path.split(/[\\/]/).pop();
+  const p = await confirm({ title: 'Restore this backup?', body: `${what}\nBrands that aren’t on this computer are added back with their profiles. Brands you already have are left as they are.`, confirm: 'Restore', input: { label: 'Backup passphrase', password: true } });
   if (!p) return;
   restoring.value = b.path;
-  try { const r = await api('backup.restore', { path: b.path, passphrase: p }); ok(`Restored ${r.brands} brand${r.brands === 1 ? '' : 's'}`); } catch (e) { fail(e, 'Restore failed'); } finally { restoring.value = null; }
+  try { await api('backup.restore', { path: b.path, passphrase: p }); void list.reload(true); /* main toasts what was restored */ } catch (e) { fail(e, 'Restore failed'); } finally { restoring.value = null; }
 }
 async function restoreFile() {
   try {
     const [path] = await api('app.pickFiles', { filters: [{ name: 'Cubby backup', extensions: ['cubbybak'] }] });
-    if (path) await restore({ path, sizeBytes: 0, at: new Date().toISOString() });
+    if (path) await restore({ path });
   } catch (e) { fail(e); }
 }
 const reveal = (p: string) => api('app.revealPath', { path: p }).catch(e => fail(e));
@@ -155,7 +157,7 @@ const exportNames = computed(() => (exportIds.value ?? []).map(id => brands.data
     <Modal :open="pickOpen" title="Export brands" size="sm" @update:open="v => (pickOpen = v)">
       <div class="row between mb-3"><span class="small muted">{{ picked.size }} of {{ brands.data.value?.length ?? 0 }} selected</span><button type="button" class="link small" @click="picked.size === (brands.data.value?.length ?? 0) ? (picked = new Set()) : openPick()">{{ picked.size === (brands.data.value?.length ?? 0) ? 'Select none' : 'Select all' }}</button></div>
       <ul class="pick">
-        <li v-for="b in brands.data.value ?? []" :key="b.id"><label><input type="checkbox" :checked="picked.has(b.id)" @change="togglePick(b.id)" /><BrandAvatar :brand="b" :size="24" /><span class="grow">{{ b.name }}</span><span class="tiny muted">{{ b.accounts.length }} account{{ b.accounts.length === 1 ? '' : 's' }}</span></label></li>
+        <li v-for="b in brands.data.value ?? []" :key="b.id"><label><input type="checkbox" :checked="picked.has(b.id)" @change="togglePick(b.id)" /><BrandAvatar :brand="b" :size="24" /><span class="grow ellipsis" :title="b.name">{{ b.name }}</span><span class="tiny muted nowrap num">{{ b.accounts.length }} account{{ b.accounts.length === 1 ? '' : 's' }}</span></label></li>
       </ul>
       <template #footer><Btn variant="subtle" @click="pickOpen = false">Cancel</Btn><Btn variant="primary" :disabled="!picked.size" icon-right="arrow" @click="toExport">Next</Btn></template>
     </Modal>
@@ -172,6 +174,8 @@ const exportNames = computed(() => (exportIds.value ?? []).map(id => brands.data
 .bl { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); }
 .bl li { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; }
 .bl li + li { border-top: 1px solid var(--line-soft); }
+.bl .grow { min-width: 0; }
+.bl .num { white-space: nowrap; }
 .pick { max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-lg); }
 .pick li + li { border-top: 1px solid var(--line-soft); }
 .pick label { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; }

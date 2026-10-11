@@ -67,10 +67,11 @@ const shown = computed(() => (recording.value ? (live.value ? pretty(live.value)
 </template>
 
 <style scoped>
+.hk { width: 100%; max-width: 420px; }
 .box { width: 100%; max-width: 420px; display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--panel); text-align: left; transition: border-color 160ms, box-shadow 160ms; }
 .box:hover { border-color: var(--line-strong); }
 .box.rec { border-color: var(--focus-border); box-shadow: var(--focus-ring); }
 .box.rec kbd { border-color: var(--fg); color: var(--fg); }
 kbd { font-size: var(--fs-xs); padding: 3px 8px; }
-.ph { color: var(--faint); font-size: var(--fs-sm); }
+.ph { color: var(--muted); font-size: var(--fs-sm); }
 </style>

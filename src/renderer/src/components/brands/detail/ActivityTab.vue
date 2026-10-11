@@ -42,15 +42,15 @@ const reveal = (p: string | null | undefined) => { if (p) api('app.revealPath', 
     </div>
     <LoadError v-if="list.error.value" :error="list.error.value" title="Could not load activity" @retry="list.reload()" />
     <div v-else-if="list.loading.value" class="panel"><div v-for="i in 6" :key="i" class="ev"><div class="skel-line" :style="{ width: `${30 + (i % 3) * 15}%` }" /></div></div>
-    <EmptyState v-else-if="!rows.length" icon="activity" title="Nothing here yet" body="Opening, posting, logins and every Claude action in this brand show up here." />
+    <EmptyState v-else-if="!rows.length" icon="activity" :title="actor ? `Nothing from ${actors.find(x => x.value === actor)?.label ?? actor} yet` : 'Nothing here yet'" :body="actor ? 'Pick Everyone to see what others did in this brand.' : 'Opening, posting, logins and every Claude action in this brand show up here.'" />
     <ol v-else class="panel">
       <li v-for="a in rows" :key="a.id" class="ev" :class="{ failed: humanAction(a).failed }">
         <span class="when tiny muted num" :title="dateTime(a.at)">{{ ago(a.at) }}</span>
-        <ActorChip :actor="a.actor" />
+        <span class="who"><ActorChip :actor="a.actor" /></span>
         <div class="grow what">
-          <div class="small"><span class="strong">{{ humanAction(a).text }}</span><span v-if="detailLine(a)" class="muted"> — {{ detailLine(a) }}</span></div>
+          <div class="small one" :title="detailLine(a) ? `${humanAction(a).text} — ${detailLine(a)}` : undefined"><span class="strong">{{ humanAction(a).text }}</span><span v-if="detailLine(a)" class="muted d">— {{ detailLine(a) }}</span></div>
         </div>
-        <button v-if="a.screen" type="button" class="thumb" title="Screenshot" @click="shot = a"><img :src="fileUrl(a.screen)" alt="" loading="lazy" /></button>
+        <button v-if="a.screen" type="button" class="thumb" title="Open the screenshot" aria-label="Open the screenshot" @click="shot = a"><img :src="fileUrl(a.screen)" alt="" loading="lazy" /></button>
         <span v-if="humanAction(a).guard" class="gi" title="A guardrail stepped in"><Icon name="shield" :size="15" /></span>
       </li>
       <li v-if="rows.length >= limit" class="more"><Btn size="sm" variant="subtle" @click="limit += 200">Show older</Btn></li>
@@ -68,9 +68,14 @@ const reveal = (p: string | null | undefined) => { if (p) api('app.revealPath', 
 .ev + .ev { border-top: 1px solid var(--line-soft); }
 .when { width: 92px; flex: none; }
 .what { min-width: 0; }
-.what .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who { width: 104px; flex: none; display: flex; }
+/* the action stays whole; its detail truncates (full text in the tooltip) */
+.one { display: flex; align-items: baseline; gap: .3em; min-width: 0; white-space: nowrap; }
+.one .strong { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.one .d { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .failed .strong { color: var(--bad); }
 .gi { color: var(--warn); display: grid; }
+.thumb:hover { border-color: var(--line-strong); }
 .thumb { width: 56px; height: 34px; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); flex: none; background: var(--panel-2); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
 .full { width: 100%; border-radius: 6px; border: 1px solid var(--line); }

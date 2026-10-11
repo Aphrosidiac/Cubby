@@ -43,7 +43,7 @@ async function copy() {
 
 <template>
   <div ref="root" class="totp" :class="{ low: left <= 5, err: !!err }" :title="err ?? 'Current 2FA code — click to copy'">
-    <button type="button" class="code-btn" :disabled="!code" @click="copy">
+    <button type="button" class="code-btn" :disabled="!code" :aria-label="code ? `2FA code ${shown}, copy` : '2FA code unavailable'" @click="copy">
       <svg class="ring" width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
         <circle cx="11" cy="11" r="9" class="bg" />
         <circle cx="11" cy="11" r="9" class="fg" :stroke-dasharray="dash" transform="rotate(-90 11 11)" />
@@ -59,6 +59,7 @@ async function copy() {
 .totp { display: inline-flex; align-items: center; gap: 8px; }
 .code-btn { display: inline-flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px 0 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); transition: border-color 160ms; }
 .code-btn:hover:not(:disabled) { border-color: var(--fg); }
+.code-btn:active:not(:disabled) { background: var(--panel-2); }
 .code-btn:disabled { cursor: default; }
 .digits { font-family: var(--mono); font-size: var(--fs-lg); letter-spacing: .08em; font-weight: 500; min-width: 7.2ch; text-align: left; }
 .err .digits { font-family: var(--sans); font-size: var(--fs-sm); letter-spacing: 0; color: var(--muted); }

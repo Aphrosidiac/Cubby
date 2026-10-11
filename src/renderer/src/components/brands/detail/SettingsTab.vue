@@ -15,6 +15,7 @@ import { normalizeUrl } from '../actions';
 import { api } from '@/lib/api';
 import { app } from '@/lib/store';
 import { useLoad } from '@/composables/useLoad';
+import { guardUnsaved } from '@/components/settings/useSection';
 import { fail, ok } from '@/composables/toast';
 
 /** Every brand field on one page with a save bar: identity, startup pages, window, downloads, Chrome install, approval. */
@@ -29,6 +30,7 @@ type Form = ReturnType<typeof snap>;
 const form = reactive<Form>(snap(props.brand));
 const base = ref(JSON.stringify(snap(props.brand)));
 const dirty = computed(() => JSON.stringify(form) !== base.value);
+guardUnsaved(() => dirty.value);
 // a live update from elsewhere refreshes the form only when there is nothing unsaved
 watch(() => props.brand, b => { if (!dirty.value) { Object.assign(form, snap(b)); base.value = JSON.stringify(snap(b)); } });
 
@@ -103,7 +105,7 @@ const addUrl = () => form.startupUrls.push('');
     <section class="sec">
       <div class="sh"><h3 class="h3">Window</h3><p class="tiny muted">Size and position when the brand opens. Tile / Cascade on Brands rearranges open windows.</p></div>
       <div class="col gap-4">
-        <Segmented v-model="preset" size="sm" :options="PRESETS" />
+        <Segmented v-model="preset" size="sm" :options="PRESETS" class="fit" />
         <div v-if="preset === 'custom' || customOpen" class="row wrap gap-2">
           <label class="mini-f"><span class="tiny muted">Width</span><input v-model.number="form.width" type="number" min="400" class="input num" /></label>
           <label class="mini-f"><span class="tiny muted">Height</span><input v-model.number="form.height" type="number" min="300" class="input num" /></label>
@@ -152,4 +154,7 @@ const addUrl = () => form.startupUrls.push('');
 .pick { display: flex; gap: 8px; align-items: center; }
 .pick .input { cursor: pointer; }
 .bad { color: var(--bad); }
+.fit { align-self: flex-start; }
+.urls .input { flex: 1; min-width: 0; }
+.pick .input { flex: 1; min-width: 0; }
 </style>
