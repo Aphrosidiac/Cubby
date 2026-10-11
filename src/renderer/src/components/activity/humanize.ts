@@ -1,6 +1,7 @@
 // Activity rows store the command name (posts.create, brands.open.failed …) plus a redacted input.
 // These turn them into a sentence and a one-line detail a person can scan.
-import type { Activity } from '@shared/types';
+import type { Activity, Platform } from '@shared/types';
+import { platformName } from '@shared/platforms';
 import { dateTime, plural } from '@/lib/format';
 
 const VERBS: Record<string, string> = {
@@ -82,5 +83,12 @@ export function detailLine(a: Pick<Activity, 'action' | 'detail'>): string {
   if (Array.isArray(paths)) return plural(paths.length, 'file');
   const reason = pick(d, 'reason');
   if (typeof reason === 'string') return reason;
+  // rows written by the scheduler / MCP carry their facts at the top level
+  const platform = pick(d, 'platform'), handle = pick(d, 'handle');
+  if (typeof platform === 'string') return [platformName(platform as Platform), typeof handle === 'string' ? handle : ''].filter(Boolean).join(' · ');
+  const to = pick(d, 'to');
+  if (typeof to === 'string') { const from = pick(d, 'from'); return typeof from === 'string' ? `${from} → ${to}` : `to ${to}`; }
+  const via = pick(d, 'via');
+  if (typeof via === 'string') return `token “${via}”`;
   return '';
 }

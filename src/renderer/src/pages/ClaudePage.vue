@@ -132,12 +132,12 @@ onBeforeUnmount(offAct);
             <li v-for="c in clients" :key="c.sessionId">
               <span class="cdot" :class="{ on: c.working }" />
               <div class="grow">
-                <div class="small strong ellipsis" :title="c.tokenName">{{ c.tokenName }}</div>
+                <div class="cname"><span class="small strong ellipsis" :title="c.tokenName">{{ c.tokenName }}</span><Chip v-if="c.working" size="sm" tone="signal">Working</Chip></div>
                 <div class="tiny muted">connected {{ agoNow(c.connectedAt) }} · {{ c.lastCallAt ? `last call ${agoNow(c.lastCallAt)}` : 'no calls yet' }}</div>
+                <!-- the brand this session is locked to (guardrail 1) -->
+                <span v-if="c.brandLock" class="lock small" :title="`Locked to ${lockBrand(c.brandLock).name}`"><Icon name="lock" :size="12" /><BrandAvatar :brand="lockBrand(c.brandLock)" :size="16" /><span class="ellipsis">{{ lockBrand(c.brandLock).name }}</span></span>
+                <span v-else class="lock none tiny muted"><Icon name="unlock" :size="12" />Not locked to a brand yet</span>
               </div>
-              <span v-if="c.brandLock" class="lock small" :title="`Locked to ${lockBrand(c.brandLock).name}`"><Icon name="lock" :size="12" /><BrandAvatar :brand="lockBrand(c.brandLock)" :size="16" /><span class="ellipsis">{{ lockBrand(c.brandLock).name }}</span></span>
-              <span v-else class="tiny muted nowrap">No brand yet</span>
-              <Chip v-if="c.working" size="sm" tone="signal">Working</Chip>
             </li>
           </ul>
         </div>
@@ -279,7 +279,12 @@ onBeforeUnmount(offAct);
 .clients li:first-child, .tokens li:first-child { border-top: 0; padding-top: 0; }
 .cdot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: none; }
 .cdot.on { background: var(--lime); box-shadow: 0 0 0 1px var(--ink); }
-.lock { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 7px; border-radius: 99px; background: var(--panel-2); max-width: 46%; min-width: 0; flex: none; }
+.lock { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 3px 9px 3px 7px; border-radius: 99px; background: var(--panel-2); max-width: 100%; min-width: 0; }
+.lock.none { background: none; padding-left: 0; }
+.cname { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cname > .chip { flex: none; }
+.clients li { align-items: flex-start; }
+.clients .cdot { margin-top: 6px; }
 .lock > .icon, .lock > .ba { flex: none; }
 .tname { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .ti { margin-top: 2px; flex: none; }
