@@ -96,6 +96,8 @@ function key(i: number, e: KeyboardEvent) {
 .thumbs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
 .th { position: relative; width: 92px; height: 92px; border-radius: 6px; overflow: hidden; background: var(--panel-2); display: grid; place-items: center; flex: none; cursor: grab; transition: transform 200ms var(--ease-out), box-shadow 200ms, opacity 200ms; }
 .th img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+/* a hairline over the picture so very dark or very light media keep their edge on either theme */
+.th:not(.add)::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgb(127 127 120 / .28); pointer-events: none; }
 .th.dragging { opacity: .4; }
 .th.target { box-shadow: -4px 0 0 var(--lime), -5px 0 0 var(--ink); }
 .th:focus-visible { outline-offset: 2px; }

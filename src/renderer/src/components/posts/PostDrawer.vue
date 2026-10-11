@@ -240,6 +240,7 @@ const go = (to: string | { path: string; query?: Record<string, string> }) => { 
 .thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
 .mt { position: relative; width: 84px; height: 84px; border-radius: 6px; overflow: hidden; background: var(--panel-2); display: grid; place-items: center; color: var(--muted); }
 .mt img { width: 100%; height: 100%; object-fit: cover; }
+.mt::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgb(127 127 120 / .28); pointer-events: none; }
 .miss { position: absolute; left: 4px; bottom: 4px; padding: 0 5px; border-radius: 3px; background: var(--bad); color: #fff; font-weight: 600; }
 .shot { border-radius: 6px; overflow: hidden; transition: transform 200ms var(--ease-out), box-shadow 200ms; box-shadow: 0 0 0 1px var(--line-soft); }
 .shot:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--line-strong); }
