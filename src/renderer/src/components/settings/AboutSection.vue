@@ -32,6 +32,6 @@ const platform = (p?: string) => (p === 'win32' ? 'Windows' : p === 'darwin' ? '
 
 <style scoped>
 .hero { display: flex; align-items: center; gap: 18px; padding: 4px 0 24px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
-.ab { max-width: 760px; }
+.ab { max-width: none; }
 .ab dd { overflow-wrap: anywhere; }
 </style>

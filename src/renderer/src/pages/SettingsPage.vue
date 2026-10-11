@@ -52,4 +52,6 @@ const current = computed(() => SECTIONS[tab.value as keyof typeof SECTIONS]);
 
 <style scoped>
 .tabs { margin: -8px 0 26px; position: sticky; top: var(--topbar); z-index: 20; background: var(--bg); }
+/* all nine tabs stay in view at the smallest window */
+@media (max-width: 1100px) { .page .tabs { gap: 14px; } }
 </style>

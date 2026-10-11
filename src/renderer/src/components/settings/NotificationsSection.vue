@@ -32,16 +32,16 @@ function setChat(v: string) { form.notifications.telegramChatId = v.trim() || nu
     <div class="set-row">
       <div class="set-l"><span class="t">Telegram</span><span class="d">Optional. The same alerts as a Telegram message, for when you are away. Create a bot with @BotFather, send it a message, then paste its token and your chat id.</span></div>
       <div class="set-c">
-        <Field label="Bot token" :error="tokOk ? null : 'Looks like 123456789:AA… from @BotFather'" class="w">
+        <Field label="Bot token" for="tg-token" :error="tokOk ? null : 'Looks like 123456789:AA… from @BotFather'" class="w">
           <div class="tok">
-            <input :value="form.notifications.telegramBotToken ?? ''" :type="showTok ? 'text' : 'password'" class="input code" autocomplete="off" spellcheck="false" placeholder="123456789:AAH…" @input="setTok(($event.target as HTMLInputElement).value)" />
-            <button type="button" class="eye" :aria-label="showTok ? 'Hide token' : 'Show token'" @click="showTok = !showTok"><Icon :name="showTok ? 'lock' : 'eye'" :size="14" /></button>
+            <input id="tg-token" :value="form.notifications.telegramBotToken ?? ''" :type="showTok ? 'text' : 'password'" class="input code" autocomplete="off" spellcheck="false" placeholder="123456789:AAH…" @input="setTok(($event.target as HTMLInputElement).value)" />
+            <button type="button" class="eye" :aria-label="showTok ? 'Hide token' : 'Show token'" :title="showTok ? 'Hide token' : 'Show token'" :aria-pressed="showTok" @click="showTok = !showTok"><Icon :name="showTok ? 'lock' : 'eye'" :size="14" /></button>
           </div>
         </Field>
-        <Field label="Chat id" :error="chatOk ? null : 'A number like 123456789 (or -100… for a group)'" class="w">
-          <input :value="form.notifications.telegramChatId ?? ''" class="input code" autocomplete="off" spellcheck="false" placeholder="123456789" @input="setChat(($event.target as HTMLInputElement).value)" />
+        <Field label="Chat id" for="tg-chat" :error="chatOk ? null : 'A number like 123456789 (or -100… for a group)'" class="w">
+          <input id="tg-chat" :value="form.notifications.telegramChatId ?? ''" class="input code" autocomplete="off" spellcheck="false" placeholder="123456789" @input="setChat(($event.target as HTMLInputElement).value)" />
         </Field>
-        <Btn size="sm" icon="send" :disabled="!tgReady" @click="test">Test</Btn>
+        <div class="set-pair"><Btn size="sm" icon="check" :disabled="!tgReady" @click="test">Check details</Btn><span class="set-note">Checks the token and chat id look right. Cubby only messages Telegram when something needs you.</span></div>
       </div>
     </div>
     <SaveBar :show="dirty" :busy="busy" :disabled="!tokOk || !chatOk" @save="save('Notification settings saved')" @discard="discard" />
@@ -50,8 +50,9 @@ function setChat(v: string) { form.notifications.telegramChatId = v.trim() || nu
 
 <style scoped>
 .w { width: 100%; max-width: 420px; }
-.tok { position: relative; }
-.tok .input { padding-right: 40px; }
-.eye { position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 6px; color: var(--muted); }
-.eye:hover { background: var(--panel-2); color: var(--fg); }
+.tok { display: flex; gap: 8px; }
+.tok .input { flex: 1; min-width: 0; }
+.eye { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: var(--r); border: 1px solid var(--line); color: var(--muted); transition: color 160ms, border-color 160ms, background-color 160ms; }
+.eye:hover { color: var(--fg); border-color: var(--line-strong); }
+.eye:active, .eye[aria-pressed='true'] { background: var(--panel-2); color: var(--fg); }
 </style>

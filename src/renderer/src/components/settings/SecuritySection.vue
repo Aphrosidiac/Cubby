@@ -15,10 +15,11 @@ const ready = computed(() => p1.value.length >= 6 && p1.value === p2.value && (!
 async function save() {
   if (!ready.value) return;
   busy.value = true;
+  const wasSet = isSet.value;
   try {
     app.settings = await api('settings.setUnlockPassphrase', { passphrase: p1.value, current: isSet.value ? cur.value : undefined });
     cur.value = ''; p1.value = ''; p2.value = '';
-    ok(isSet.value ? 'Unlock passphrase changed' : 'Unlock passphrase set');
+    ok(wasSet ? 'Unlock passphrase changed' : 'Unlock passphrase set');
   } catch (e) { fail(e, 'Could not set the passphrase'); } finally { busy.value = false; }
 }
 </script>

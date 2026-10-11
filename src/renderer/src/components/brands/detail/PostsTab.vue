@@ -40,32 +40,33 @@ const cols = [
   { key: 'status', label: 'Status', align: 'right' as const }
 ];
 const go = (p: Post) => router.push(`/compose?post=${p.id}`);
+// the table is keyed by view and fed null until loaded, so only live changes flash — not the first load or a filter switch
 </script>
 
 <template>
-  <div>
+  <div class="posts-tab">
     <div class="bar">
       <Segmented v-model="view" size="sm" :options="[{ value: 'queue', label: 'Queue', count: counts.queue }, { value: 'history', label: 'History', count: counts.history }, { value: 'all', label: 'All', count: counts.all }]" />
       <span class="grow" />
       <Btn size="sm" variant="subtle" icon="calendar" to="/calendar">Calendar</Btn>
-      <Btn size="sm" variant="primary" icon="compose" :to="`/compose?brand=${brand.id}`">New post</Btn>
+      <Btn v-if="!brand.deletedAt" size="sm" variant="primary" icon="compose" :to="`/compose?brand=${brand.id}`">New post</Btn>
     </div>
     <LoadError v-if="list.error.value" :error="list.error.value" title="Could not load posts" @retry="list.reload()" />
-    <DataTable v-else :columns="cols" :rows="rows" :loading="list.loading.value" @row-click="go">
+    <DataTable v-else :key="view" :columns="cols" :rows="list.data.value ? rows : null" :loading="list.loading.value" @row-click="go">
       <template #cell-caption="{ row }">
-        <div class="cap"><div class="small ellipsis">{{ row.caption || '(no caption)' }}</div><div class="tiny muted">{{ KIND_LABEL[row.kind as Post['kind']] }} · {{ row.assetIds.length }} file{{ row.assetIds.length === 1 ? '' : 's' }}</div></div>
+        <div class="cap"><div class="small ellipsis" :class="{ muted: !row.caption }" :title="row.caption || undefined">{{ row.caption || 'No caption' }}</div><div class="tiny muted">{{ KIND_LABEL[row.kind as Post['kind']] }}<template v-if="row.assetIds.length"> · {{ row.assetIds.length }} file{{ row.assetIds.length === 1 ? '' : 's' }}</template></div></div>
       </template>
-      <template #cell-platforms="{ row }"><div class="row gap-1"><PlatformIcon v-for="p in platformsOf(row)" :key="p" :platform="p" :size="15" /></div></template>
+      <template #cell-platforms="{ row }"><div class="row gap-1 nowrap"><PlatformIcon v-for="p in platformsOf(row)" :key="p" :platform="p" :size="15" /></div></template>
       <template #cell-scheduledAt="{ row }"><span class="small nowrap">{{ row.scheduledAt ? dateTime(row.scheduledAt) : '—' }}</span></template>
       <template #cell-status="{ row }">
         <div class="row gap-2 end">
-          <button v-if="liveUrl(row)" type="button" class="link tiny" @click.stop="openLive(row)">View <Icon name="external" :size="11" class="inl" /></button>
+          <button v-if="liveUrl(row)" type="button" class="link tiny nowrap" title="Open the live post" @click.stop="openLive(row)">View <Icon name="external" :size="11" class="inl" /></button>
           <Chip :tone="postStatus(row.status).tone" size="sm">{{ postStatus(row.status).label }}</Chip>
         </div>
       </template>
       <template #empty>
         <EmptyState compact icon="compose" :title="view === 'history' ? 'Nothing posted yet' : 'Nothing in the queue'" body="Compose a post for this brand — it is paced per account and waits for approval if the brand needs it.">
-          <Btn size="sm" icon="compose" :to="`/compose?brand=${brand.id}`">New post</Btn>
+          <Btn v-if="!brand.deletedAt" size="sm" icon="compose" :to="`/compose?brand=${brand.id}`">New post</Btn>
         </EmptyState>
       </template>
     </DataTable>
@@ -74,6 +75,8 @@ const go = (p: Post) => router.push(`/compose?post=${p.id}`);
 
 <style scoped>
 .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.cap { max-width: 420px; min-width: 0; }
+.posts-tab { container-type: inline-size; }
+/* the caption gives way first so the table never scrolls sideways */
+.cap { max-width: min(420px, 30cqw); min-width: 0; }
 .inl { display: inline; vertical-align: -1px; }
 </style>

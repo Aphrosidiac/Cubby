@@ -17,13 +17,14 @@ export function useSection<K extends keyof Settings>(keys: K[]) {
     base.value = JSON.stringify(pick());
   }, { deep: true });
   const busy = ref(false);
-  async function save(msg = 'Settings saved') {
+  /** msg = the toast on success; null saves quietly (the caller toasts once for several saves) */
+  async function save(msg: string | null = 'Settings saved') {
     busy.value = true;
     try {
       app.settings = await api('settings.set', { patch: JSON.parse(JSON.stringify(form)) });
       Object.assign(form, pick());
       base.value = JSON.stringify(pick());
-      ok(msg);
+      if (msg) ok(msg);
       return true;
     } catch (e) { fail(e, 'Could not save settings'); return false; } finally { busy.value = false; }
   }
