@@ -1,7 +1,9 @@
-# Cubby — Plan v2 (complete desktop app)
+# Cubby — Plan v3 (complete desktop app, one-shot build)
 
-> Every brand gets its own cubby. Status: **plan, nothing built**. v2 written 2026-10-11:
-> v1 was a CLI + MCP with no home app; v2 is a complete AdsPower-style desktop app.
+> Every brand gets its own cubby. v3 written 2026-10-11 on the Windows dev machine:
+> v1 was a CLI + MCP with no home app; v2 made it a complete AdsPower-style desktop app;
+> **v3 locks the stack (zero native modules), records the Phase 0 results, and adds the build
+> contract (§18) so the whole app is built in one pass.**
 > The hosted version (Dalang, `~/Desktop/dev/Dalang`) is parked on cost.
 
 ---
@@ -57,15 +59,16 @@ A **desktop app for Mac and Windows** that works like AdsPower, built around you
 │ Renderer (Vue 3): Home · Brand detail · Composer · Calendar · Approvals · Media ·   │
 │                   Flows · Activity · Claude · Settings · Recycle bin                │
 │        │ typed IPC (contextIsolation, preload bridge)                               │
-│ Main process (Node):                                                                │
-│   Core: brands/accounts store (SQLite) · launcher · window manager · CDP connector  │
+│ Main process (Node 24 inside Electron):                                             │
+│   CORE (one service layer — every door calls the same functions):                  │
+│         store (node:sqlite) · launcher · window manager · CDP connector             │
 │         guardrails · pacing ledger · recipes · flows engine · scheduler · health    │
 │         media indexer · backup/export · secrets (safeStorage → OS keychain)         │
-│   Local API  http://127.0.0.1:7820      (token) ──┐                                 │
-│   MCP        http://127.0.0.1:7820/mcp  (token) ──┴── Claude Code, scripts          │
+│   Doors: IPC (renderer) · Local API http://127.0.0.1:7820 · MCP …:7820/mcp          │
+│          all three are thin adapters over CORE, so no door can skip a guardrail     │
 │   Tray / menu-bar icon · global hotkey quick switcher · OS notifications            │
 └──────────────┬──────────────────────────┬───────────────────────────────────────────┘
-               │ CDP 127.0.0.1:9301       │ CDP 127.0.0.1:9302        (one port per brand)
+               │ CDP 127.0.0.1:<auto>     │ CDP 127.0.0.1:<auto>   (port read from DevToolsActivePort)
                ▼                          ▼
    Google Chrome — brand "FF"     Google Chrome — brand "Ascend"     … closed brands = folders
    own user-data-dir, own logins  own user-data-dir, own logins
@@ -73,39 +76,53 @@ A **desktop app for Mac and Windows** that works like AdsPower, built around you
 
 ---
 
-## 3. Stack
+## 3. Stack (locked 2026-10-11)
 
-| Area | Pick |
-|---|---|
-| Shell | **Electron** (current stable), `electron-builder` → `.dmg` (Mac arm64/x64) and `.exe` (Windows NSIS) |
-| UI | **Vue 3 + Vite + Pinia + vue-router**, FF Ops design tokens/components as the base (Select, Card, Field…), light + dark |
-| Calendar | `@fullcalendar/vue3` (month / week / list) |
-| Flow builder | `@vue-flow/core` canvas + step-list editor |
-| Data | **SQLite** via `better-sqlite3` + **Drizzle ORM** (rebuilt for Electron) |
-| Browser control | `playwright-core` `chromium.connectOverCDP` |
-| Local API | `fastify@5` bound to 127.0.0.1 |
-| MCP | `@modelcontextprotocol/sdk`, Streamable HTTP on the Local API server |
-| Secrets | Electron `safeStorage` (Keychain on Mac, DPAPI on Windows) |
-| 2FA codes | `otplib` |
-| Media | bundled `ffprobe`/`ffmpeg` static binaries |
-| Export crypto | Node `crypto` (AES-256-GCM, scrypt key from your passphrase) |
-| Tests | `vitest` (core), Playwright for Electron (UI e2e) |
-| Language | TypeScript, pnpm |
+Rule: **fewest moving parts, each the most battle-tested option.** No native Node modules at all —
+nothing to rebuild per Electron/OS, no Visual Studio build tools needed on Windows.
 
----
+| Area | Pick | Why |
+|---|---|---|
+| Shell | **Electron 44** (Chromium 152, Node 24) | See "Why Electron" below |
+| Build | **electron-vite 5** (main / preload / renderer, HMR) + `electron-builder` → NSIS `.exe`, `.dmg` | One config, fast dev loop |
+| UI | **Vue 3.5 + vue-router 4**, the **FF Ops UI kit + tokens** ported (plain CSS custom properties, light + dark), small `reactive()` stores — no Pinia/Tailwind | Proven kit, zero CSS build tooling |
+| Calendar | `@fullcalendar/vue3` 6 (month / week / list, drag to reschedule) | |
+| Flow editor | Step-list editor (drag to reorder, per-step forms) | A canvas adds nothing for linear flows |
+| Data | **`node:sqlite` (built into Node 24)**, WAL, hand-written SQL migrations + typed repositories | Verified inside Electron 44 (Phase 0). Zero native deps |
+| Validation | `zod` 4 — one schema per command, shared by IPC / API / MCP | |
+| Browser control | `playwright-core` 1.64 `chromium.connectOverCDP` + raw CDP sessions | Auto-waiting actions, `setInputFiles`, aria snapshots for Claude |
+| Local API | `fastify` 5 on 127.0.0.1 | |
+| MCP | `@modelcontextprotocol/sdk` 1.32, Streamable HTTP mounted on the same Fastify server | |
+| Secrets | Electron `safeStorage` (Keychain / DPAPI); encrypted blobs in SQLite | |
+| 2FA | `otplib` | |
+| Schedules | `croner` (cron + next-run calc) | |
+| Media | `ffmpeg-static` + `ffprobe-static` (asar-unpacked) | |
+| Export crypto | Node `crypto`: AES-256-GCM, scrypt(passphrase) | |
+| Tests | `vitest` (store, pacing, guardrails, checkpoint detectors, crypto, TOTP) + smoke e2e on the built app | |
+| Language / pm | TypeScript, pnpm workspace | |
+
+### Why Electron (measured 2026-10-11 on the Windows box)
+- Electron 44 window with a 200-row table: **309 MB** working set, ready in 128 ms. **One** brand Chrome
+  on instagram.com: **800 MB**. With 5 brands open the shell is ~7% of the total — the brand Chromes
+  are the weight, and every option has to run those.
+- Tauri was rejected: browser control (Playwright), the MCP SDK and the recipes are Node. Tauri would
+  need a Node sidecar (two runtimes, IPC between them) for a ~60–100 MB saving; pure Rust would swap
+  Playwright for far less proven CDP crates exactly where posting reliability lives.
+- **Tray mode destroys the window.** Closing Cubby to the tray destroys the BrowserWindow (frees the
+  renderer); the main process (scheduler, API, MCP) keeps running. Brand Chromes are detached anyway.
 
 ## 4. Data model (SQLite)
 
 ```
-Brand        id, serial (#001…), name, slug, logo, color, groupId, tags[], notes,
-             profileDir, cdpPort, chromePath?, startupUrls[], window{w,h,x,y},
+Brand        id, serial (#001…), name, slug, logo, color, groupId, tags[], notes, sort,
+             profileDir, cdpPort (last seen), pid (last seen), chromePath?, startupUrls[], window{w,h,x,y},
              downloadsDir, approvalRequired, status(closed|opening|open|error),
              lastOpenedAt, createdAt, deletedAt? (recycle bin)
 Group        id, name, color, sort
 Tag          id, name, color
 Account      id, brandId, platform, handle, displayName, profileUrl, ageTier(new|warm|established),
              loginState(ok|expiring|expired|unknown), cookieExpiresAt, lastCheckedAt,
-             secretRef? (Keychain item: username / password / TOTP secret), notes
+             secret? (safeStorage-encrypted blob: username / password / TOTP secret), notes
 MediaAsset   id, path, filename, hash, durationMs, width, height, fps, codec, sizeBytes,
              thumb, tags[], platformFit{instagram_reel: ok|warn|bad, …}, addedAt
 Post         id, brandId, accountIds[], kind(reel|video|image|carousel|text|story),
@@ -117,6 +134,8 @@ Slot         id, brandId, weekday[], time            (posting slots for "Add to 
 Flow         id, name, brandScope(one|many|any), steps(json), schedule?(cron), enabled
 FlowRun      id, flowId, brandId, status, startedAt, endedAt, log(json), screens[]
 PacingRule   platform, ageTier, minGapMin, dailyMax, jitterMin
+PostLedger   accountId, platform, postedAt                 (pacing source of truth)
+WatchFolder  id, path, tags[]
 ApiToken     id, name, hash, scopes[], brandIds[]?, createdAt, lastUsedAt
 Activity     id, at, actor(you|claude|scheduler|flow|api), brandId?, action, detail(json), screen?
 Setting      key, value
@@ -130,18 +149,24 @@ Files live in `%APPDATA%\Cubby\` (Windows) or `~/Library/Application Support/Cub
 ## 5. How a brand opens
 
 ```
-"Google Chrome" --user-data-dir=<profiles>/<slug> --remote-debugging-port=<port>
+"Google Chrome" --user-data-dir=<profiles>/<slug> --remote-debugging-port=0
   --no-first-run --no-default-browser-check
   --disable-backgrounding-occluded-windows --disable-renderer-backgrounding
   --disable-background-timer-throttling          # no upload stalls when the window is covered
   --window-size=W,H --window-position=X,Y  <startup URLs>
 ```
+- `--remote-debugging-port=0`: Chrome picks a free port and writes it to `<profile>/DevToolsActivePort`;
+  the app reads it. No port allocator, no collisions with anything else on the machine.
+- Chrome is spawned **detached**: quitting or updating Cubby leaves open brands running. On start the
+  app **re-adopts** them (read DevToolsActivePort → probe `/json/version` → reconnect).
 - Separate profile folder per brand = separate cookies, storage, extensions, history. Your own Chrome
   is untouched. (Chrome 136+ only allows remote debugging on non-default profiles — which these are.)
 - Per-brand settings written to the profile's `Preferences` before launch: theme colour, session
   restore on, downloads folder, Chrome password manager off (the app's account manager does that job).
   No managed Chrome policies — on a Mac they'd hit your personal Chrome too.
-- The app watches each Chrome process: status updates live in the list; a crash shows "Reopen".
+- The app watches each Chrome (CDP disconnect + 5 s heartbeat): status updates live in the list; a
+  crash shows "Reopen". Tile / cascade / bring-to-front use CDP `Browser.setWindowBounds` — no
+  OS-specific window code.
 - CDP binds to 127.0.0.1 only; Chrome rejects web-page origins on it.
 - Known limit: Cmd-Tab / taskbar shows every brand as "Google Chrome"; the theme colour, a title
   badge and the app's "bring to front" / quick switcher make up for it.
@@ -178,7 +203,8 @@ Tabs:
 - **Overview** — status, Open / Close / Bring to front, platforms with login state + "Check now",
   next scheduled posts, recent activity.
 - **Accounts** — per platform: handle, profile link, age tier, login state & cookie expiry, saved
-  credentials (masked, reveal with Touch ID / Windows Hello), **live 2FA code** with copy, **Fill login**
+  credentials (masked; reveal with Touch ID on Mac, the app unlock passphrase on Windows — Electron
+  has no Windows Hello API), **live 2FA code** with copy, **Fill login**
   (types username/password into this brand's open login page).
 - **Settings** — name/logo/colour/group/tags/notes, startup URLs, window size/position, downloads
   folder, Chrome install, approval required, pacing tier overrides.
@@ -320,7 +346,8 @@ brand at a time. Machine asleep/off → missed posts run on wake, re-paced (or s
 
 ## 12. Security
 - Profiles + DB inside your user account; FileVault / BitLocker on.
-- Credentials only in the OS keychain via `safeStorage`; reveal/export need Touch ID / Windows Hello / OS password.
+- Credentials encrypted with `safeStorage` (OS keychain key); reveal/export need Touch ID (Mac) or the
+  app unlock passphrase (Windows).
 - Local API + MCP on 127.0.0.1 with tokens; CDP ports on 127.0.0.1.
 - Electron hardening: `contextIsolation`, no `nodeIntegration` in the renderer, strict CSP, typed IPC allowlist.
 - Activity log is append-only from the UI.
@@ -342,19 +369,26 @@ docs/
 
 ---
 
-## 14. Phases (each ends with something you can use)
+## 14. Phase 0 results (2026-10-11, Windows 11, Chrome 154.0.8037.98)
 
-| Phase | Builds | Done when |
-|---|---|---|
-| **0 · Checks** (1 session, on the Windows dev machine) | Several brand Chromes driven at once; no stalls when covered (measured); `setInputFiles` on FB/IG/TikTok; import from your "Work" profile keeps FF logins; theme colour via Preferences; cookie names | `docs/PHASE0.md` with results |
-| **1 · Home app** | Electron shell, Home (table/cards, groups, tags, search, filters, batch actions), New brand wizard, Brand detail (Overview, Settings), open/close/crash detection, tile/cascade, tray, quick switcher, recycle bin | You manage every brand from the app like AdsPower |
-| **2 · Accounts & health** | Account manager (Keychain, Fill login, 2FA codes), login health + notifications, Cookies tab, Extensions tab, import from Chrome profile | Every brand shows its login state; relogin is two clicks |
-| **3 · Claude** | Local API, MCP + all guardrails, Claude page (status, Stop, Connect Claude Code, tokens), Activity | Claude Code posts to the right brand through the app; Stop works mid-run |
-| **4 · Posting** | Media library + watch folders, Composer, recipes (IG reel/carousel, FB reel, TikTok first), Approvals, Calendar/Queue, slots, scheduler | A week of scheduled FF + Ascend posts approved in the app; zero wrong-account posts, zero rate-limit flags |
-| **5 · Flows** | Flow builder, recorder, schedules, more recipes (YT Shorts, Threads, X, LinkedIn, stories) | You build and schedule a custom flow without code |
-| **6 · Ship** | Backups, brand export/import, Windows + Mac builds, installers, auto-update, polish | Install on another machine and import your brands |
+| Check | Result |
+|---|---|
+| `node:sqlite` inside Electron 44.7.0 (Node 24.21) | ✅ works, JSON1 available → no native SQLite module |
+| 3 brand Chromes at once, own `--user-data-dir` + CDP | ✅ all three CDP endpoints up in 743 ms |
+| Playwright 1.64 `connectOverCDP` to all three in parallel | ✅ |
+| `setInputFiles` through CDP | ✅ (synthetic page; FB/IG/TikTok confirmed when the recipes run live) |
+| Timers not throttled (`--disable-background-timer-throttling` etc.) | ✅ 21–22 ticks / 2 s at a 100 ms interval |
+| Cookie expiry readable without page loads | ✅ `context.cookies(url)` returns name + expires |
+| Theme colour via `Preferences` before launch | written; visual confirmation in the first app run |
+| Import from an existing Chrome profile | Cookies are encrypted per OS user — the import copies the profile's files into the brand folder on the same machine (same user + same Chrome = decryptable) |
 
----
+## 14b. Build order (one pass)
+
+| Step | Builds |
+|---|---|
+| 1 · Foundation | pnpm workspace, electron-vite app, shared types + zod schemas, SQLite migrations + repos, CORE command registry, IPC bridge, FF UI kit + shell layout |
+| 2 · Modules (parallel) | launcher/CDP/windows/health/accounts/secrets · Local API + MCP + guardrails · recipes + checkpoint detectors + flows engine + recorder + scheduler · media + backup/export · every renderer page |
+| 3 · Integration | wire modules into CORE, typecheck, vitest, build the Windows installer, launch the built app and drive it: create FF + Ascend, open/close, health, compose → prepare → approve, flow run, MCP via Claude Code, kill switch |
 
 ## 15. Deliberately not included
 | AdsPower feature | Why not |
@@ -383,5 +417,24 @@ docs/
 | L1 | Name | **Cubby** (decided 2026-10-11) |
 | L2 | First brands | FF + Ascend |
 | L3 | Approval default | On |
-| L4 | Seed FF from your "Work" Chrome profile | Yes, if Phase 0 confirms |
+| L4 | Seed FF from your "Work" Chrome profile | Yes — profile-copy import on the same machine |
+| L6 | Stack | Electron 44 + electron-vite + Vue 3 + node:sqlite + Playwright CDP + Fastify + MCP SDK (§3) |
+| L7 | Brand Chromes outlive the app | Yes — detached, re-adopted on start |
 | L5 | Notifications beyond OS | Telegram later, optional |
+
+---
+
+## 18. Build contract (how the code is shaped)
+
+- **CORE commands.** Every capability is one function `(input, ctx) => output` registered by name
+  (`brands.create`, `brands.open`, `posts.prepare`, …) with a zod input schema. `ctx.actor` is
+  `you | claude | scheduler | flow | api`. Guardrails and Activity logging run inside CORE, keyed off
+  the actor — the doors only authenticate and translate.
+- **IPC:** one `invoke(command, input)` channel + one `event` push channel (`brand.status`,
+  `run.progress`, `approvals.count`, `activity.new`, …). The preload exposes only these two.
+- **Local API** maps REST routes to commands; **MCP** maps tools to commands with `actor: 'claude'`
+  and the brand lock from the MCP session.
+- **Runs** (recipes, flows, Claude browser tools) go through one run manager: one run per brand at a
+  time, abortable (kill switch aborts all), every step logged + screenshot on failure.
+- **Recipes are flows written in TypeScript** using the same step runtime as user flows.
+- **Checkpoint detectors and platform specs are pure functions** in `packages/shared`, unit-tested.
