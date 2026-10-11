@@ -36,7 +36,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', key); if (locked) 
           <header class="dh">
             <div class="grow">
               <div v-if="eyebrow" class="label">{{ eyebrow }}</div>
-              <h2 v-if="title" class="h2 ellipsis">{{ title }}</h2>
+              <h2 v-if="title" class="h2 ellipsis" :title="title">{{ title }}</h2>
               <slot name="head" />
             </div>
             <slot name="actions" />

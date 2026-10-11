@@ -95,9 +95,9 @@ input[type='checkbox'], input[type='radio'], input[type='range'], progress { acc
 .section-title { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); padding-bottom: var(--s3); border-bottom: 1px solid var(--fg); margin-bottom: var(--s4); }
 
 /* definition lists (key facts) */
-.facts { display: grid; grid-template-columns: minmax(110px, auto) minmax(0, 1fr); column-gap: var(--s5); }
+.facts { display: grid; grid-template-columns: minmax(110px, auto) minmax(0, 1fr); column-gap: 0; }
 .facts > dt { padding: 10px 0; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: var(--fs-sm); }
-.facts > dd { padding: 10px 0; border-top: 1px solid var(--line-soft); text-align: right; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.facts > dd { padding: 10px 0 10px var(--s5); border-top: 1px solid var(--line-soft); text-align: right; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
 .facts > dt:first-of-type, .facts > dt:first-of-type + dd { border-top: 0; }
 
 /* ── native form base (components refine) ── */

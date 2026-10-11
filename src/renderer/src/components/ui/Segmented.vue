@@ -4,7 +4,7 @@ import Icon from './Icon.vue';
 import { useOverflowEdges } from '@/composables/overflow';
 
 /** Pill toggle with a sliding highlight — the control from ffdev.studio's bottom nav. */
-const props = withDefaults(defineProps<{ modelValue: string; options: { value: string; label?: string; icon?: string; count?: number | null }[]; size?: 'sm' | 'md' }>(), { size: 'md' });
+const props = withDefaults(defineProps<{ modelValue: string; options: { value: string; label?: string; icon?: string; count?: number | null; /** accessible name + tooltip for icon-only options */ title?: string }[]; size?: 'sm' | 'md' }>(), { size: 'md' });
 defineEmits<{ 'update:modelValue': [v: string] }>();
 const root = ref<HTMLElement | null>(null);
 const hl = ref({ x: 0, w: 0, ready: false });
@@ -32,7 +32,7 @@ watch(() => [props.modelValue, props.options.map(o => `${o.value}${o.count ?? ''
 <template>
   <div ref="root" class="seg" :class="[`s-${size}`, { 'fade-l': edges.left.value, 'fade-r': edges.right.value, measured: hl.ready, settled, still }]" role="group">
     <span class="hl" :class="{ ready: hl.ready }" :style="{ transform: `translateX(${hl.x}px)`, width: `${hl.w}px` }" />
-    <button v-for="o in options" :key="o.value" type="button" :aria-pressed="o.value === modelValue" @click="$emit('update:modelValue', o.value)">
+    <button v-for="o in options" :key="o.value" type="button" :aria-pressed="o.value === modelValue" :aria-label="o.label ? undefined : (o.title ?? o.value)" :title="o.label ? o.title : (o.title ?? o.value)" @click="$emit('update:modelValue', o.value)">
       <Icon v-if="o.icon" :name="o.icon" :size="15" />
       <span v-if="o.label">{{ o.label }}</span>
       <span v-if="o.count !== undefined && o.count !== null" class="count num">{{ o.count }}</span>
