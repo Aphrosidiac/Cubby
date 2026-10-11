@@ -1,0 +1,36 @@
+appId: studio.ffdev.cubby
+productName: Cubby
+directories:
+  buildResources: build
+  output: release/${version}
+files:
+  - out/**
+  - resources/**
+  - package.json
+  - '!**/.vscode/*'
+asarUnpack:
+  - resources/**
+  - node_modules/ffmpeg-static/**
+  - node_modules/ffprobe-static/**
+extraResources:
+  - from: resources
+    to: resources
+win:
+  executableName: Cubby
+  target: [nsis]
+nsis:
+  artifactName: Cubby-${version}-setup.${ext}
+  shortcutName: Cubby
+  uninstallDisplayName: Cubby
+  createDesktopShortcut: always
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+mac:
+  target: [dmg]
+  category: public.app-category.productivity
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: false
+dmg:
+  artifactName: Cubby-${version}-${arch}.${ext}
+npmRebuild: false
+publish: null

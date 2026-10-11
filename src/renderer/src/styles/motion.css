@@ -1,0 +1,115 @@
+/*
+ * FF motion grammar — Locate → Cut → Resolve → Hold.
+ * Entrances ease out hard; cuts ease in-out; nothing bounces. Everything here
+ * collapses to an instant under prefers-reduced-motion (bottom of file).
+ */
+
+/* ── entrances ── */
+@keyframes ff-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes ff-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ff-pop { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ff-drop { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes ff-mask-up { from { transform: translateY(105%); } to { transform: none; } }
+@keyframes ff-slash-wipe {
+  from { clip-path: polygon(0 0, 0 0, calc(0% - 14vh) 100%, calc(0% - 14vh) 100%); }
+  to { clip-path: polygon(0 0, calc(100% + 14vh) 0, 100% 100%, calc(0% - 14vh) 100%); }
+}
+@keyframes ff-shimmer { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+@keyframes ff-spin { to { transform: rotate(360deg); } }
+@keyframes ff-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.9); opacity: 0; } }
+@keyframes ff-flash { 0% { box-shadow: inset 3px 0 0 var(--lime); background-color: color-mix(in srgb, var(--lime) 16%, transparent); } 100% { box-shadow: inset 3px 0 0 transparent; background-color: transparent; } }
+@keyframes ff-shake { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(14deg); } 40% { transform: rotate(-12deg); } 60% { transform: rotate(8deg); } 80% { transform: rotate(-4deg); } }
+@keyframes ff-draw { from { stroke-dashoffset: var(--len, 1000); } to { stroke-dashoffset: 0; } }
+@keyframes ff-grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes ff-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes ff-tick { from { transform: scale(.3) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Staggered reveal: add .reveal to a container; children rise in with --i delays. */
+.reveal > * { animation: ff-rise var(--t-reveal) var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 45ms + var(--d, 0ms)); }
+.rise { animation: ff-rise var(--t-reveal) var(--ease-out) backwards; animation-delay: var(--d, 0ms); }
+.fade-in { animation: ff-fade .5s var(--ease-out) backwards; animation-delay: var(--d, 0ms); }
+.pop-in { animation: ff-pop .42s var(--ease-out) backwards; animation-delay: var(--d, 0ms); }
+.flash { animation: ff-flash 1.6s var(--ease-out); }
+
+/* line mask reveal for display type */
+.mask { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .08em; margin-bottom: -.08em; }
+.mask > span { display: inline-block; animation: ff-mask-up .9s var(--ease-out) both; animation-delay: var(--d, 0ms); }
+
+/* skeletons */
+.skel { border-radius: var(--r); background: var(--skeleton); background-size: 220% 100%; animation: ff-shimmer 1.4s linear infinite; color: transparent !important; }
+.skel-line { height: 12px; border-radius: 3px; background: var(--skeleton); background-size: 220% 100%; animation: ff-shimmer 1.4s linear infinite; }
+
+/* ── Vue transitions ── */
+
+/* route: old page lifts away fast; new page is cut in on the slash angle then its content resolves */
+.route-leave-active { transition: opacity 180ms var(--ease-cut), transform 180ms var(--ease-cut); }
+.route-leave-to { opacity: 0; transform: translateY(-6px); }
+.route-enter-active { animation: ff-slash-wipe 700ms var(--ease-out) both; }
+.route-enter-active > .page > * { animation: ff-rise 700ms var(--ease-out) backwards; }
+.route-enter-active > .page > *:nth-child(1) { animation-delay: 40ms; }
+.route-enter-active > .page > *:nth-child(2) { animation-delay: 90ms; }
+.route-enter-active > .page > *:nth-child(3) { animation-delay: 140ms; }
+.route-enter-active > .page > *:nth-child(4) { animation-delay: 190ms; }
+.route-enter-active > .page > *:nth-child(5) { animation-delay: 240ms; }
+.route-enter-active > .page > *:nth-child(n + 6) { animation-delay: 280ms; }
+
+.fade-enter-active, .fade-leave-active { transition: opacity var(--t-nav) var(--ease-out); }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.swap-enter-active { transition: opacity 360ms var(--ease-out), transform 360ms var(--ease-out); }
+.swap-leave-active { transition: opacity 160ms var(--ease-cut), transform 160ms var(--ease-cut); position: absolute; }
+.swap-enter-from { opacity: 0; transform: translateY(8px); }
+.swap-leave-to { opacity: 0; transform: translateY(-4px); }
+
+.pop-enter-active { transition: opacity 260ms var(--ease-out), transform 320ms var(--ease-out); }
+.pop-leave-active { transition: opacity 140ms var(--ease-cut), transform 140ms var(--ease-cut); }
+.pop-enter-from { opacity: 0; transform: translateY(-6px) scale(.97); }
+.pop-leave-to { opacity: 0; transform: translateY(-4px) scale(.98); }
+
+.slide-down-enter-active, .slide-down-leave-active { transition: grid-template-rows 360ms var(--ease-out), opacity 300ms var(--ease-out); display: grid; }
+.slide-down-enter-from, .slide-down-leave-to { grid-template-rows: 0fr; opacity: 0; }
+.slide-down-enter-to, .slide-down-leave-from { grid-template-rows: 1fr; opacity: 1; }
+.slide-down-enter-active > *, .slide-down-leave-active > * { overflow: hidden; min-height: 0; }
+
+/* list transitions (TransitionGroup name="list") with FLIP moves */
+.list-move { transition: transform 460ms var(--ease-out); }
+.list-enter-active { transition: opacity 420ms var(--ease-out), transform 420ms var(--ease-out); }
+.list-leave-active { transition: opacity 200ms var(--ease-cut), transform 200ms var(--ease-cut); }
+.list-enter-from { opacity: 0; transform: translateY(10px); }
+.list-leave-to { opacity: 0; transform: translateX(-12px); }
+.list-leave-active.is-abs { position: absolute; }
+
+/* modal + drawer */
+.modal-enter-active .scrim, .drawer-enter-active .scrim { transition: opacity 320ms var(--ease-out); }
+.modal-leave-active .scrim, .drawer-leave-active .scrim { transition: opacity 200ms var(--ease-cut); }
+.modal-enter-from .scrim, .modal-leave-to .scrim, .drawer-enter-from .scrim, .drawer-leave-to .scrim { opacity: 0; }
+.modal-enter-active .dialog { transition: opacity 360ms var(--ease-out), transform 460ms var(--ease-out); }
+.modal-leave-active .dialog { transition: opacity 180ms var(--ease-cut), transform 180ms var(--ease-cut); }
+.modal-enter-from .dialog { opacity: 0; transform: translateY(18px) scale(.97); }
+.modal-leave-to .dialog { opacity: 0; transform: translateY(8px) scale(.985); }
+.drawer-enter-active .sheet { transition: transform 520ms var(--ease-out), opacity 300ms var(--ease-out); }
+.drawer-leave-active .sheet { transition: transform 240ms var(--ease-cut), opacity 240ms var(--ease-cut); }
+.drawer-enter-from .sheet, .drawer-leave-to .sheet { transform: translateX(104%); opacity: .6; }
+.modal-enter-active, .modal-leave-active, .drawer-enter-active, .drawer-leave-active { transition: opacity 520ms; }
+
+/* toast stack */
+.toast-move { transition: transform 420ms var(--ease-out); }
+.toast-enter-active { transition: opacity 420ms var(--ease-out), transform 520ms var(--ease-out); }
+.toast-leave-active { transition: opacity 220ms var(--ease-cut), transform 260ms var(--ease-cut); position: absolute; right: 0; }
+.toast-enter-from { opacity: 0; transform: translateY(18px) scale(.96); }
+.toast-leave-to { opacity: 0; transform: translateX(40px); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; transition-delay: 0ms !important; scroll-behavior: auto !important; }
+}
+/* phones: modals are bottom sheets — they rise from the edge rather than scale in */
+@media (max-width: 560px) {
+  .modal-enter-active .dialog { transition: transform 480ms var(--ease-out), opacity 200ms; }
+  .modal-leave-active .dialog { transition: transform 260ms var(--ease-cut), opacity 260ms var(--ease-cut); }
+  .modal-enter-from .dialog, .modal-leave-to .dialog { opacity: 1; transform: translateY(100%); }
+}
+@media (max-width: 560px) {
+  .toast-enter-from { transform: translateY(-110%); opacity: 0; }
+  .toast-leave-active { left: 0; right: 0; }
+  .toast-leave-to { transform: translateY(-40%); opacity: 0; }
+}
