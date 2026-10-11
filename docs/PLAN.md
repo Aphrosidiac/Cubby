@@ -19,7 +19,7 @@ guardrails we learned from posting FF. No server, no subscription, nothing new t
    the hidden-window stall, the file-picker hack and the "wrong Chrome" mix-ups.
 4. Videos go straight from disk (FFAds renders) into the composer.
 5. Scheduled posting with pacing and approval, while the Mac is awake.
-6. **Fits in 8 GB RAM** alongside your normal work.
+6. Runs on any Mac; no limits baked in for a particular machine.
 
 ### Non-goals
 - No fingerprint spoofing, no proxies. Isolation, not disguise.
@@ -28,18 +28,12 @@ guardrails we learned from posting FF. No server, no subscription, nothing new t
 
 ---
 
-## 1. The constraint that shapes everything: 8 GB
+## 1. Resources
 
-This Mac (A18 Pro, 8 GB) already runs Claude, dev servers and your normal Chrome. A brand Chrome
-with IG + FB + TikTok open is ≈ 1.5–2.5 GB. So:
-
-- **One brand awake at a time by default** (two max, configurable). Opening a third closes the
-  least-recently-used one (profile is on disk, nothing is lost).
-- **Tabs on demand**, not pinned: a brand opens to a light start page; a platform tab opens when
-  needed and is closed when the task ends.
-- **Auto-close** a brand 10 min after the last action (configurable, off while you're using it).
-- Memory-lean flags (§3.2). The posting queue runs brands **one after another**, never in parallel.
-- Phase 0 measures the real numbers; the defaults above are tuned from them.
+No built-in limits: open as many brands as you like, tabs stay open, nothing closes on its own, and
+the queue runs different brands in parallel (posts for the *same account* still follow pacing).
+How many brands fit at once is simply what the machine's RAM allows (≈ 1.5–2.5 GB per brand with
+IG + FB + TikTok open; measured in Phase 0).
 
 ---
 
@@ -91,7 +85,6 @@ open -na "Google Chrome" --args \
   --disable-renderer-backgrounding \
   --disable-background-timer-throttling \
   --disable-features=Translate,MediaRouter \
-  --renderer-process-limit=4 \                 # cap RAM (tuned in Phase 0)
   bb://start
 ```
 - Separate `--user-data-dir` = separate cookies, storage, history, extensions. Your personal Chrome
@@ -113,7 +106,7 @@ open -na "Google Chrome" --args \
 
 ### 3.4 `brands.yaml`
 ```yaml
-defaults: { maxAwake: 1, idleCloseMin: 10, approval: true }
+defaults: { approval: true }
 brands:
   - slug: ff
     name: FF Dev Studio
@@ -136,7 +129,7 @@ brands:
 | Command | Does |
 |---|---|
 | `bb list` | Brands, awake/asleep, login health per platform. |
-| `bb open <brand> [platform]` | Wakes the brand (closing LRU if over `maxAwake`), fronts its window, opens the platform tab. |
+| `bb open <brand> [platform]` | Opens the brand (or fronts it if already open), optionally on a platform tab. |
 | `bb close <brand>` / `bb close --all` | Graceful quit (profile flushed). |
 | `bb add <brand>` | Creates profile dir, assigns port, writes Preferences, adds to yaml. |
 | `bb login <brand>` | Opens every platform's login page for that brand so you log in once. |
@@ -195,7 +188,7 @@ changed), Claude takes over the same tab through the MCP tools, or you do.
   → creates a draft per platform; **approve at scheduling time** (preview screenshots), then it runs
   unattended at the slot.
 - **launchd** agent runs `bb queue tick` every minute: due + approved + pacing OK → open brand →
-  publish → close brand → notify. One post at a time.
+  publish → notify. Brands run in parallel; one run per brand at a time.
 - **Mac asleep or lid closed = no posting.** Missed slots run when it wakes, re-paced. Optional:
   `pmset repeat wake` for a fixed daily posting window.
 
@@ -205,7 +198,7 @@ changed), Claude takes over the same tab through the MCP tools, or you do.
 Reads each platform's session cookie **presence + expiry** over CDP (no page loads): IG `sessionid`,
 FB `c_user`+`xs`, TikTok `sessionid`, X `auth_token`, LinkedIn `li_at`, YouTube `__Secure-3PSID`
 (names confirmed in Phase 0). Runs whenever a brand opens, plus a daily `bb health` via launchd
-that wakes each brand in turn for a few seconds (one at a time, RAM-safe). States: ok / expiring
+that briefly opens any brand that isn't already open. States: ok / expiring
 (< 7 days) / expired → macOS notification "Ascend → TikTok needs relogin". Relogin is always you.
 
 ---
@@ -243,8 +236,8 @@ docs/
 ## 10. Phases
 
 ### Phase 0 — Checks on this Mac (1 session)
-1. Two brand Chromes at once, separate dirs + ports, both driven via `connectOverCDP`. **Measure RAM**
-   with IG + FB + TikTok open → sets `maxAwake` and the tab policy.
+1. Several brand Chromes at once, separate dirs + ports, all driven via `connectOverCDP`; note RAM
+   per brand with IG + FB + TikTok open (for reference, not a limit).
 2. Throttling flags work on macOS: covered window keeps `visibilityState`/timers running and an IG
    upload completes behind the Claude window (measured, not eyeballed).
 3. `setInputFiles` uploads on FB, IG, TikTok composers.
@@ -254,8 +247,8 @@ docs/
 **Exit:** `docs/PHASE0.md` with numbers.
 
 ### Phase 1 — Brands (1–2 sessions)
-Registry, `bb add/open/close/list/login`, LRU + idle close, launcher apps with brand-kit icons.
-**Accept:** Spotlight "Ascend" opens Ascend's own Chrome; opening FF too closes the older one when `maxAwake: 1`.
+Registry, `bb add/open/close/list/login`, launcher apps with brand-kit icons.
+**Accept:** Spotlight "Ascend" opens Ascend's own Chrome; FF opens alongside it, each with its own logins.
 
 ### Phase 2 — MCP (1–2 sessions)
 All §5 tools, brand lock, off-limits URLs, audit.
@@ -287,7 +280,6 @@ Chrome + Node run there too) so posting doesn't depend on the MacBook being open
 ## 12. Risks
 | Risk | Mitigation |
 |---|---|
-| 8 GB pressure → swap, sluggish Mac | maxAwake 1, tabs on demand, idle close, measured in Phase 0. |
 | Platform UI change breaks a recipe | Claude/you take over the tab; fix the recipe; detectors fail loudly, never post blind. |
 | Mac asleep at post time | Catch-up with pacing; optional scheduled wake; Phase 5 Windows poster. |
 | Automation vs platform terms | Human pace, approval, real accounts, your real connection. Accept residual risk knowingly. |
@@ -297,7 +289,6 @@ Chrome + Node run there too) so posting doesn't depend on the MacBook being open
 ## 13. What this version gives up (vs Dalang)
 - Not reachable from your phone or other machines; profiles live on this Mac only (Keychain-bound).
 - Posting needs the Mac awake.
-- Limited by 8 GB to ~1–2 brands open at once.
 If any of those starts to hurt, the Dalang plan is the upgrade path; the recipes and guardrails
 port across unchanged.
 
@@ -308,6 +299,5 @@ port across unchanged.
 |---|---|---|
 | L1 | Name | see chat |
 | L2 | First brands | FF + Ascend |
-| L3 | `maxAwake` | 1 (raise after Phase 0 if RAM allows) |
-| L4 | Approval default | On |
-| L5 | Seed FF from your existing "Work" Chrome profile or log in fresh | Seed (if Phase 0 confirms) |
+| L3 | Approval default | On |
+| L4 | Seed FF from your existing "Work" Chrome profile or log in fresh | Seed (if Phase 0 confirms) |
