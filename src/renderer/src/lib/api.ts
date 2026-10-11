@@ -13,7 +13,9 @@ export class ApiError extends Error {
 }
 
 export async function api<K extends CommandName>(name: K, ...args: {} extends In<K> ? [input?: In<K>] : [input: In<K>]): Promise<Out<K>> {
-  const r = await window.cubby.invoke(name, args[0] ?? {})
+  // Vue reactive proxies can't cross IPC (structured clone throws "could not be cloned"): send plain data
+  const input = args[0] === undefined ? {} : JSON.parse(JSON.stringify(args[0]))
+  const r = await window.cubby.invoke(name, input)
   if (!r.ok) throw new ApiError(r.error.message, r.error.code, r.error.rule)
   return r.data as Out<K>
 }

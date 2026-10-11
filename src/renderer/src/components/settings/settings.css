@@ -1,0 +1,17 @@
+/* Settings layout: a label column (title + why) and a control column, hairline-separated rows. */
+.set-sec { max-width: 920px; }
+.set-row { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 28px; padding: 22px 0; border-top: 1px solid var(--line-soft); }
+.set-row:first-child { border-top: 0; padding-top: 4px; }
+.set-l { display: flex; flex-direction: column; gap: 4px; }
+.set-l .t { font-weight: 600; font-size: var(--fs-base); }
+.set-l .d { font-size: var(--fs-xs); color: var(--muted); line-height: 1.5; }
+.set-c { min-width: 0; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.set-c > .input, .set-c > .ff-select { max-width: 420px; width: 100%; }
+.set-pair { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.set-pair .input.num { width: 110px; }
+.set-note { font-size: var(--fs-xs); color: var(--muted); line-height: 1.5; max-width: 560px; }
+.set-status { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.set-status .d { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.set-status.ok .d { background: var(--good); }
+.set-status.bad .d { background: var(--bad); }
+@media (max-width: 1100px) { .set-row { grid-template-columns: minmax(0, 1fr); gap: 12px; } }

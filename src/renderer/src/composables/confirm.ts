@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
 
-export interface ConfirmOpts { title: string; body?: string; confirm?: string; cancel?: string; danger?: boolean; input?: { label: string; placeholder?: string; required?: boolean; value?: string; multiline?: boolean } }
+export interface ConfirmOpts { title: string; body?: string; confirm?: string; cancel?: string; danger?: boolean; input?: { label: string; placeholder?: string; required?: boolean; value?: string; multiline?: boolean; /** mask the typed value (passphrases) */ password?: boolean } }
 export const confirmState = reactive<{ open: boolean; opts: ConfirmOpts | null; resolve: ((v: string | boolean | null) => void) | null }>({ open: false, opts: null, resolve: null });
 
 /** Promise-based confirm. With `input`, resolves to the typed string (or null when cancelled). */

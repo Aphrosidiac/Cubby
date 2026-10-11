@@ -137,6 +137,8 @@ export const contract = {
     { actors: ['you'], readOnly: true }
   ),
   'app.readImageDataUrl': cmd<string>()(z.object({ path: z.string(), maxPx: z.number().optional() }), { actors: ['you'], readOnly: true }),
+  /** bring the main Cubby window up at a route (quick switcher, notifications) */
+  'app.showInMain': cmd<void>()(z.object({ path: z.string().startsWith('/') }), { actors: ['you'], readOnly: true }),
   'app.brandKits': cmd<{ name: string; path: string; dataUrl: string }[]>()(none, { actors: ['you'], readOnly: true }),
 
   // ── Settings ────────────────────────────────────────────────────────────────
@@ -253,6 +255,8 @@ export const contract = {
     z.object({ id, patch: z.object({ accountIds: z.array(id).optional(), kind: postKind.optional(), assetIds: z.array(id).optional(), caption: z.string().optional(), perPlatform: perPlatform.optional(), scheduledAt: iso.nullable().optional() }) }),
     { scope: 'posting' }
   ),
+  /** send an existing draft on its way (same post id): schedule at a time, next free slot, or now */
+  'posts.submit': cmd<Post>()(z.object({ id, mode: z.enum(['schedule', 'queue', 'now']), scheduledAt: iso.nullable().optional() }), { scope: 'posting' }),
   'posts.delete': cmd<void>()(z.object({ id }), { actors: ['you'] }),
   'posts.fit': cmd<{ accountId: string; platform: Platform; level: FitLevel; notes: string[] }[]>()(
     z.object({ brandId: id, kind: postKind, assetIds: z.array(id), accountIds: z.array(id), caption: z.string(), perPlatform: perPlatform.default({}) }),

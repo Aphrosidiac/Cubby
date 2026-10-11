@@ -116,6 +116,7 @@ const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.
 .search { display: flex; align-items: center; gap: 10px; width: min(420px, 38vw); height: 36px; padding: 0 8px 0 14px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: var(--fs-base); text-align: left; transition: border-color 200ms, box-shadow 300ms var(--ease-out); }
 .search:hover { border-color: var(--line-strong); box-shadow: var(--shadow-1); }
 .search-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search kbd { white-space: nowrap; flex: none; }
 .pill { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 99px; font-size: var(--fs-sm); font-weight: 500; white-space: nowrap; }
 .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; position: relative; }
 .pill .dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: currentColor; animation: ff-pulse 2.4s var(--ease-out) infinite; }

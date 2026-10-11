@@ -3,6 +3,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { UserError } from '../../core/errors'
+import { findClaudeCli } from '../mcp/connect'
 
 const TIMEOUT_MS = 10 * 60_000
 let cached: string | null | undefined
@@ -18,7 +19,7 @@ export async function resolveClaude(refresh = false): Promise<string | null> {
     .filter((l) => l && existsSync(l))
   const rank = (p: string) => (/\.exe$/i.test(p) ? 0 : /\.cmd$/i.test(p) ? 1 : /\.bat$/i.test(p) ? 2 : process.platform === 'win32' ? 9 : 0)
   found.sort((a, b) => rank(a) - rank(b))
-  cached = found.find((p) => rank(p) < 9) ?? null
+  cached = found.find((p) => rank(p) < 9) ?? findClaudeCli()
   return cached
 }
 

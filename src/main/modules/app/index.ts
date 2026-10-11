@@ -16,6 +16,7 @@ import { requestStatus, runtime, setKillSwitch, setStatusEmitter } from '../../c
 import { getSecretSetting, getSettings, setSecretSetting, setSettings } from '../../core/settings'
 import { chromeInfo } from '../browser'
 import { liveRuns } from '../runs'
+import { closeSwitcher, showMainWindow } from '../../windows'
 
 export function buildStatus(): AppStatus {
   const s = getSettings()
@@ -140,6 +141,10 @@ implement({
   },
   'app.readImageDataUrl': ({ path, maxPx }) => imageDataUrl(path, maxPx ?? 256),
   'app.brandKits': () => scanBrandKits(),
+  'app.showInMain': ({ path }) => {
+    showMainWindow(path)
+    closeSwitcher()
+  },
 
   'settings.get': () => getSettings(),
   'settings.set': ({ patch }) => {

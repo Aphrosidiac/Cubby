@@ -93,7 +93,8 @@ interface Checked {
 }
 
 /** Accounts belong to the brand, platforms support the kind, files exist, captions fit. */
-function validateContent(c: Content, opts: { needMedia: boolean }): Checked {
+/** strictCaption=false (drafts) lets an over-limit caption be saved; it is enforced once the post is submitted. */
+function validateContent(c: Content, opts: { needMedia: boolean; strictCaption?: boolean }): Checked {
   const brand = getBrand(c.brandId)
   if (brand.deletedAt) throw new UserError(`${brand.name} is in the recycle bin — restore it first`)
   if (!c.accountIds.length) throw new UserError('Pick at least one account')
@@ -116,7 +117,7 @@ function validateContent(c: Content, opts: { needMedia: boolean }): Checked {
   }
   const problems: string[] = []
   for (const p of new Set(accounts.map((a) => a.platform))) for (const x of captionProblems(p, captionFor(c.caption, c.perPlatform, p))) problems.push(`${platformName(p)}: ${x}`)
-  if (problems.length) throw new UserError(problems.join('; '))
+  if (problems.length && opts.strictCaption !== false) throw new UserError(problems.join('; '))
   return { brand, accounts, assets }
 }
 
@@ -364,18 +365,24 @@ export function nextSlotFor(brandId: string, accountIds?: string[], excludeId?: 
 }
 
 // ── commands ──────────────────────────────────────────────────────────────────
-async function createPost(i: Parsed<'posts.create'>, actor: Actor): Promise<Post> {
-  const { brand } = validateContent(i, { needMedia: i.mode !== 'draft' })
-  let scheduledAt = i.scheduledAt ? toIso(i.scheduledAt) : null
-  if (i.mode === 'schedule') {
+/** When a post in this mode should go out. */
+function resolveSchedule(mode: 'draft' | 'schedule' | 'queue' | 'now', brand: { id: string; name: string }, accountIds: string[], requested: string | null | undefined, excludeId?: string): string | null {
+  let scheduledAt = requested ? toIso(requested) : null
+  if (mode === 'schedule') {
     if (!scheduledAt) throw new UserError('Pick a date and time to schedule this post')
     if (new Date(scheduledAt).getTime() <= Date.now()) throw new UserError('Pick a time in the future')
-  } else if (i.mode === 'queue') {
-    scheduledAt = nextSlotFor(brand.id, i.accountIds)
+  } else if (mode === 'queue') {
+    scheduledAt = nextSlotFor(brand.id, accountIds, excludeId)
     if (!scheduledAt) throw new UserError(listSlots(brand.id).length ? 'No free posting slot in the next 60 days — add slots or pick a time' : `${brand.name} has no posting slots yet — add some in Calendar, or schedule a time`)
-  } else if (i.mode === 'now') {
+  } else if (mode === 'now') {
     scheduledAt = nowIso()
   }
+  return scheduledAt
+}
+
+async function createPost(i: Parsed<'posts.create'>, actor: Actor): Promise<Post> {
+  const { brand } = validateContent(i, { needMedia: i.mode !== 'draft', strictCaption: i.mode !== 'draft' })
+  const scheduledAt = resolveSchedule(i.mode, brand, i.accountIds, i.scheduledAt)
   const init = initialStatus(i.mode, brand.approvalRequired)
   const at = nowIso()
   const post: Post = {
@@ -432,9 +439,24 @@ implement({
     }
     if (!canDo(p.status, 'edit')) throw new UserError(transitionError(p.status, 'edit'), 'conflict')
     const willRun = nextStatus(p.status, 'edit') === 'queued'
-    validateContent(next, { needMedia: willRun })
+    validateContent(next, { needMedia: willRun, strictCaption: willRun || p.status !== 'draft' })
     // a changed post must be prepared + approved again: approval and screenshots are dropped
     return move(p, 'edit', { ...next, scheduledAt, approval: null, screens: [], error: null })
+  },
+
+  'posts.submit': ({ id, mode, scheduledAt }, ctx) => {
+    const p = getPost(id)
+    if (p.status !== 'draft') throw new UserError('Only drafts can be submitted — this post is already on its way', 'conflict')
+    const { brand } = validateContent(p, { needMedia: true, strictCaption: true })
+    const at = resolveSchedule(mode, brand, p.accountIds, scheduledAt, p.id)
+    if (brand.approvalRequired) {
+      // prepared in the brand window first; lands in Approvals (draft --prepare--> ready_for_approval)
+      const saved = savePost(p.id, { scheduledAt: at, error: null })
+      changed(saved.id)
+      prepareInBackground(saved.id, ctx.actor)
+      return getPost(saved.id)
+    }
+    return move(p, 'queue', { scheduledAt: at, error: null })
   },
 
   'posts.delete': ({ id }) => {

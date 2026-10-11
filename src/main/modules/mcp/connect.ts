@@ -2,7 +2,7 @@
 // Claude Code CLI. Pure command building is unit-tested; nothing here touches the person's config
 // unless runCli is called.
 import { execFile, execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -60,7 +60,44 @@ export function findClaudeCli(): string | null {
     process.platform === 'win32'
       ? [join(home, '.local', 'bin', 'claude.exe'), join(home, 'AppData', 'Roaming', 'npm', 'claude.cmd'), join(home, '.claude', 'local', 'claude.exe')]
       : [join(home, '.local', 'bin', 'claude'), join(home, '.claude', 'local', 'claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude']
-  return candidates.find((c) => existsSync(c)) ?? null
+  return candidates.find((c) => existsSync(c)) ?? desktopBundledCli()
+}
+
+/** Claude Code as bundled by the Claude desktop app: <appdata>/Claude/claude-code/<version>/<build>/claude(.exe), newest version. */
+export function desktopBundledCli(): string | null {
+  const root =
+    process.platform === 'win32'
+      ? join(process.env.APPDATA || join(homedir(), 'AppData', 'Roaming'), 'Claude', 'claude-code')
+      : process.platform === 'darwin'
+        ? join(homedir(), 'Library', 'Application Support', 'Claude', 'claude-code')
+        : join(homedir(), '.config', 'Claude', 'claude-code')
+  const exe = process.platform === 'win32' ? 'claude.exe' : 'claude'
+  let versions: string[] = []
+  try {
+    versions = readdirSync(root).filter((v) => /^\d+\.\d+\.\d+/.test(v))
+  } catch {
+    return null
+  }
+  const num = (v: string) => v.split(/[.-]/).slice(0, 3).map(Number)
+  versions.sort((a, b) => {
+    const x = num(a)
+    const y = num(b)
+    return y[0] - x[0] || y[1] - x[1] || y[2] - x[2]
+  })
+  for (const v of versions) {
+    let builds: string[] = []
+    try {
+      builds = readdirSync(join(root, v))
+    } catch {
+      continue
+    }
+    for (const b of builds) {
+      const p = join(root, v, b, exe)
+      if (existsSync(p)) return p
+    }
+    if (existsSync(join(root, v, exe))) return join(root, v, exe)
+  }
+  return null
 }
 
 export interface CliResult {
