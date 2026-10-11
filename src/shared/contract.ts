@@ -226,7 +226,7 @@ export const contract = {
   'browser.upload': cmd<{ url: string }>()(selectorTarget.extend({ paths: z.array(z.string()).min(1) }), { scope: 'browser', brandKey: 'brandId' }),
 
   // ── Media library ───────────────────────────────────────────────────────────
-  'media.list': cmd<MediaAsset[]>()(z.object({ q: z.string().optional(), tag: z.string().optional(), kind: z.enum(['video', 'image']).optional(), ids: z.array(id).optional() }).optional().default({}), { readOnly: true, scope: 'read' }),
+  'media.list': cmd<MediaAsset[]>()(z.object({ q: z.string().optional(), tag: z.string().optional(), kind: z.enum(['video', 'image']).optional(), ids: z.array(id).optional(), includeMissing: z.boolean().optional() }).optional().default({}), { readOnly: true, scope: 'read' }),
   'media.add': cmd<MediaAsset[]>()(z.object({ paths: z.array(z.string()).min(1), tags: z.array(z.string()).optional() }), { scope: 'posting' }),
   'media.update': cmd<MediaAsset>()(z.object({ id, tags: z.array(z.string()) }), { actors: ['you'] }),
   'media.remove': cmd<void>()(z.object({ ids }), { actors: ['you'] }),

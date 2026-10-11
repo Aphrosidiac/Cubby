@@ -192,7 +192,8 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
   <div class="page flow-editor">
     <PageHeader eyebrow="Flow" :title="isNew ? 'New flow' : name || flow?.name || 'Flow'" :back="{ to: '/flows', label: 'Flows' }">
       <span>{{ countSteps(steps) }} {{ countSteps(steps) === 1 ? 'step' : 'steps' }} · {{ describeSchedule(schedule) }}</span>
-      <span v-if="dirty" class="faint">Unsaved changes</span>
+      <span v-if="flow?.schedule && flow.enabled && flow.nextRunAt && !dirty">next run {{ fmtWhen(flow.nextRunAt) }}</span>
+      <span v-if="dirty" class="unsaved"><span class="udot" />Unsaved changes</span>
       <template #actions>
         <Menu :items="menu" :width="190"><Btn icon="more" square aria-label="More" title="More" /></Menu>
         <Btn icon="play" :loading="running" :disabled="!steps.length" @click="runNow">Run now</Btn>
@@ -240,7 +241,7 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
             <label v-else-if="sched === 'custom'" class="inl small grow"><input v-model="cron" class="input code-in" placeholder="*/30 9-18 * * 1-5" aria-label="Cron expression" spellcheck="false" /></label>
             <span v-if="sched !== 'off'" class="tiny muted">{{ describeSchedule(schedule) }}</span>
             <span class="grow" />
-            <Toggle v-model="enabled" label="Enabled" :hint="sched === 'off' ? 'Can be run' : 'Runs on schedule'" />
+            <Toggle v-model="enabled" label="Enabled" :hint="sched === 'off' ? 'No schedule — run it any time' : enabled ? 'Runs on its schedule' : 'Paused — skips its schedule'" />
           </div>
         </div>
       </section>
@@ -274,6 +275,10 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
 </template>
 
 <style scoped>
+/* a very long flow name stays two lines in the header (the full name is in the Name field) */
+.flow-editor :deep(.page-header .title .mask > span) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.unsaved { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); }
+.udot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px 24px; align-items: start; }
 .bp { width: min(360px, 100%); }
 .brandgrid { display: flex; flex-wrap: wrap; gap: 6px; }

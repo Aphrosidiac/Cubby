@@ -252,9 +252,10 @@ function stopWatcher(id: string): void {
 
 // ── commands ────────────────────────────────────────────────────────────────
 implement({
-  'media.list': ({ q, tag, kind, ids }) => {
+  'media.list': ({ q, tag, kind, ids, includeMissing }) => {
     if (ids?.length) return mediaByIds(ids).filter((a) => (!kind || a.kind === kind))
-    const where = ['missing = 0']
+    // the library page asks for missing files too (so they can be found and removed); pickers and doors don't
+    const where = includeMissing ? ['1 = 1'] : ['missing = 0']
     const params: string[] = []
     if (kind) {
       where.push('kind = ?')
