@@ -43,7 +43,7 @@ function close() { emit('update:open', false); setTimeout(reset, 300); }
       <CopyField :value="token" mono class="mt-4" />
     </template>
     <template v-else>
-      <Field label="Name" required><input v-model="name" class="input" placeholder="e.g. Claude Code on this PC" autofocus /></Field>
+      <Field label="Name" required><input v-model="name" class="input" placeholder="e.g. Claude Code on this PC" maxlength="80" autofocus @keydown.enter.prevent="name.trim() && scopes.length && !busy && create()" /></Field>
       <div class="mt-4">
         <div class="flabel">Scopes</div>
         <ul class="scopes">
@@ -54,7 +54,8 @@ function close() { emit('update:open', false); setTimeout(reset, 300); }
       <div class="mt-4">
         <div class="flabel">Brands <span class="muted tiny">(none = all)</span></div>
         <div class="chips">
-          <button v-for="b in brands.list" :key="b.id" type="button" class="bchip" :class="{ on: brandIds.includes(b.id) }" :aria-pressed="brandIds.includes(b.id)" @click="brandIds = toggle(brandIds, b.id)"><BrandAvatar :brand="b" :size="16" />{{ b.name }}</button>
+          <button v-for="b in brands.list" :key="b.id" type="button" class="bchip" :class="{ on: brandIds.includes(b.id) }" :aria-pressed="brandIds.includes(b.id)" :title="b.name" @click="brandIds = toggle(brandIds, b.id)"><BrandAvatar :brand="b" :size="16" /><span class="ellipsis">{{ b.name }}</span><Icon v-if="brandIds.includes(b.id)" name="check" :size="12" class="bk" /></button>
+          <span v-if="!brands.list.length" class="tiny muted">No brands yet — the token will work for every brand you add.</span>
         </div>
       </div>
     </template>
@@ -74,6 +75,9 @@ function close() { emit('update:open', false); setTimeout(reset, 300); }
 .scopes input { accent-color: var(--fg); }
 .warnt { color: var(--warn); display: flex; gap: 6px; align-items: center; margin-top: 6px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.bchip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px 0 7px; border-radius: 99px; border: 1px solid var(--line); font-size: var(--fs-sm); }
-.bchip.on { border-color: var(--fg); background: var(--bg-elev); }
+.bchip { display: inline-flex; align-items: center; gap: 6px; height: 30px; max-width: 220px; padding: 0 11px 0 7px; border-radius: 99px; border: 1px solid var(--line); font-size: var(--fs-sm); transition: border-color var(--t-micro), background-color var(--t-micro); }
+.bchip:hover { border-color: var(--line-strong); }
+.bchip.on { border-color: var(--fg); background: var(--panel-2); }
+.bchip > .ba, .bchip > .bk { flex: none; }
+.scopes li label:hover .code { color: var(--fg); }
 </style>

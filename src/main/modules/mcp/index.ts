@@ -212,6 +212,9 @@ implement({
     const { token } = createToken('Claude Code', [...CLAUDE_SCOPES], brandIds ?? null)
     const addArgs = buildAddArgs(scope, port, token)
     const full = commandLine(addArgs)
+    // "local" scope belongs to the folder the command runs in. Run from here it would land on
+    // Cubby's own working folder, so the person runs it inside their project instead.
+    if (scope === 'local') return { ok: false, command: full, output: 'Run this inside the project folder Claude Code should use — the token is shown only now.' }
     const bin = findClaudeCli()
     // Without the CLI (or when it fails) the full command is returned once so the person can run it;
     // like tokens.create, this is the only time the token is shown.

@@ -160,7 +160,7 @@ onBeforeUnmount(() => listen(false));
 
 <style>
 /* teleported: not scoped */
-.ff-select-pop { position: fixed; z-index: 1100; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-2); overflow: hidden; }
+.ff-select-pop { -webkit-app-region: no-drag; position: fixed; z-index: 1100; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-2); overflow: hidden; }
 .ff-select-pop.up { transform: translateY(-100%); }
 .ff-select-pop .search { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--muted); }
 .ff-select-pop .search input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--fg); font-size: var(--fs-base); }

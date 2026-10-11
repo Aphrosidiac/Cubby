@@ -15,7 +15,7 @@ function pick(e: Event) { const f = (e.target as HTMLInputElement).files?.[0]; i
 </script>
 
 <template>
-  <div class="drop" :class="{ over, busy, compact }" role="button" tabindex="0" @click="input?.click()" @keydown.enter="input?.click()" @dragover.prevent="over = true" @dragleave="over = false" @drop.prevent="drop">
+  <div class="drop" :class="{ over, busy, compact }" role="button" tabindex="0" @click="input?.click()" @keydown.enter.prevent="input?.click()" @keydown.space.prevent="input?.click()" @dragover.prevent="over = true" @dragleave="over = false" @drop.prevent="drop">
     <input ref="input" type="file" :accept="accept" hidden @change="pick" />
     <Icon name="upload" :size="compact ? 16 : 20" />
     <div><div class="strong small">{{ busy ? 'Uploading…' : text }}</div><div v-if="hint && !compact" class="tiny muted">{{ hint }}</div></div>

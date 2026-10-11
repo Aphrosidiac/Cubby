@@ -13,7 +13,7 @@ async function copy() {
   <div class="cf">
     <span v-if="label" class="label">{{ label }}</span>
     <div class="box" :class="{ done }">
-      <span class="v ellipsis" :class="{ code: mono }">{{ value }}</span>
+      <span class="v ellipsis" :class="{ code: mono }" :title="value">{{ value }}</span>
       <button type="button" class="cp" :aria-label="done ? 'Copied' : 'Copy'" @click="copy">
         <Transition name="swap" mode="out-in"><Icon :key="String(done)" :name="done ? 'check' : 'copy'" :size="15" /></Transition>
         <span class="t">{{ done ? 'Copied' : 'Copy' }}</span>

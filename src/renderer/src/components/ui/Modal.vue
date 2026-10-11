@@ -3,15 +3,31 @@ import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import Icon from './Icon.vue';
 import { lockScroll, unlockScroll } from '@/lib/scrollLock';
 
-/** Centered dialog. Focus moves in, Tab is trapped, Escape and the scrim close it. */
-const props = withDefaults(defineProps<{ open: boolean; title?: string; eyebrow?: string; size?: 'sm' | 'md' | 'lg' | 'xl'; closable?: boolean }>(), { size: 'md', closable: true });
+/**
+ * Centered dialog. Focus moves in, Tab is trapped, Escape and the scrim close it.
+ * `layer` lifts a dialog above other dialogs (confirm() opens over an open modal).
+ */
+const props = withDefaults(defineProps<{ open: boolean; title?: string; eyebrow?: string; size?: 'sm' | 'md' | 'lg' | 'xl'; closable?: boolean; layer?: number }>(), { size: 'md', closable: true, layer: 900 });
 const emit = defineEmits<{ 'update:open': [v: boolean]; close: [] }>();
+const root = ref<HTMLElement | null>(null);
 const dialog = ref<HTMLElement | null>(null);
 let last: Element | null = null;
 let locked = false;
 const close = () => { if (!props.closable) return; emit('update:open', false); emit('close'); };
+// Only a click that starts AND ends on the scrim closes: dragging a text selection out of
+// a field and letting go over the scrim must not throw the form away.
+let pressedScrim = false;
+const scrimDown = (e: MouseEvent) => { pressedScrim = e.target === e.currentTarget; };
+const scrimUp = (e: MouseEvent) => { if (pressedScrim && e.target === e.currentTarget) close(); pressedScrim = false; };
+/** The topmost open dialog (highest layer, then latest in the DOM). */
+function topmost() {
+  const all = [...document.querySelectorAll<HTMLElement>('.modal-root')];
+  return all.sort((a, b) => (Number(a.dataset.layer) || 0) - (Number(b.dataset.layer) || 0)).pop() === root.value;
+}
+// Escape still closes when focus has fallen out of the dialog (to <body>).
+const docKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented && !root.value?.contains(e.target as Node) && topmost()) { e.preventDefault(); close(); } };
 function key(e: KeyboardEvent) {
-  if (e.key === 'Escape') { e.stopPropagation(); close(); }
+  if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); }
   if (e.key === 'Tab' && dialog.value) {
     const f = [...dialog.value.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])')].filter(x => x.offsetParent !== null);
     if (!f.length) return;
@@ -24,25 +40,27 @@ watch(() => props.open, async o => {
   if (o) {
     last = document.activeElement;
     if (!locked) { lockScroll(); locked = true; }
+    document.addEventListener('keydown', docKey);
     await nextTick();
-    const target = dialog.value?.querySelector<HTMLElement>('[autofocus], input:not([type=hidden]), textarea, select') ?? dialog.value;
+    const target = dialog.value?.querySelector<HTMLElement>('[autofocus], input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select') ?? dialog.value;
     setTimeout(() => target?.focus(), 60);
   } else {
+    document.removeEventListener('keydown', docKey);
     if (locked) { unlockScroll(); locked = false; }
     (last as HTMLElement | null)?.focus?.();
   }
-});
-onBeforeUnmount(() => { if (locked) { unlockScroll(); locked = false; } });
+}, { immediate: true });
+onBeforeUnmount(() => { document.removeEventListener('keydown', docKey); if (locked) { unlockScroll(); locked = false; } });
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="open" class="modal-root" @keydown="key">
-        <div class="scrim" @click="close" />
+      <div v-if="open" ref="root" class="modal-root" :style="{ zIndex: layer }" :data-layer="layer" @keydown="key">
+        <div class="scrim" @mousedown="scrimDown" @mouseup="scrimUp" />
         <div ref="dialog" class="dialog" :class="`s-${size}`" role="dialog" aria-modal="true" :aria-label="title" tabindex="-1">
           <header v-if="title || closable" class="mh">
-            <div>
+            <div class="mt-wrap">
               <div v-if="eyebrow" class="label">{{ eyebrow }}</div>
               <h2 v-if="title" class="h2">{{ title }}</h2>
             </div>
@@ -57,9 +75,14 @@ onBeforeUnmount(() => { if (locked) { unlockScroll(); locked = false; } });
 </template>
 
 <style scoped>
-.modal-root { position: fixed; inset: 0; z-index: 900; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 24px 16px; overflow-y: auto; }
+/* on Windows the top edge reserves the title-bar buttons' height, so a tall or wide
+   dialog never slides under them */
+/* no-drag: over the top bar (a window drag area) a click on the scrim must close, not drag the window */
+.modal-root { --pad-t: max(24px, calc(var(--wc-h) + 12px)); position: fixed; inset: 0; z-index: 900; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: var(--pad-t) 16px 24px; overflow-y: auto; -webkit-app-region: no-drag; }
 .scrim { position: fixed; inset: 0; background: var(--scrim); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
-.dialog { position: relative; width: 100%; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-3); max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
+.dialog { position: relative; width: 100%; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-3); max-height: calc(100vh - var(--pad-t) - 24px); max-height: calc(100dvh - var(--pad-t) - 24px); display: flex; flex-direction: column; }
+.mt-wrap { min-width: 0; overflow-wrap: anywhere; }
+.mb { --table-top: 0px; --table-bg: var(--panel); }
 .dialog:focus { outline: none; }
 .s-sm { max-width: 420px; } .s-md { max-width: 560px; } .s-lg { max-width: 760px; } .s-xl { max-width: 1040px; }
 .mh { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px 24px 0; }

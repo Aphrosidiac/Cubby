@@ -51,20 +51,23 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', key); if (locked) 
 </template>
 
 <style scoped>
-.drawer-root { position: fixed; inset: 0; z-index: 800; }
+/* no-drag: over the top bar (a window drag area) a click on the scrim must close, not drag the window */
+.drawer-root { position: fixed; inset: 0; z-index: 800; -webkit-app-region: no-drag; }
 .scrim { position: absolute; inset: 0; background: var(--scrim); }
 .sheet:focus { outline: none; }
 .sheet { position: absolute; top: 0; right: 0; bottom: 0; background: var(--bg); border-left: 1px solid var(--line); box-shadow: var(--shadow-3); display: flex; flex-direction: column; }
-.dh { display: flex; align-items: flex-start; gap: 10px; padding: 22px 24px 18px; border-bottom: 1px solid var(--line); }
+/* the sheet runs to the window's top edge: on Windows the header starts under the
+   title-bar buttons so its own close button never sits beside (or under) them */
+.dh { display: flex; align-items: flex-start; gap: 10px; padding: max(22px, calc(var(--wc-h) + 10px)) 24px 18px; border-bottom: 1px solid var(--line); }
 .dh .label { margin-bottom: 6px; }
 .x { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 50%; color: var(--muted); transition: background-color 200ms, color 200ms, transform 300ms var(--ease-out); }
 .x:hover { background: var(--panel-2); color: var(--fg); transform: rotate(90deg); }
-.db { flex: 1; overflow-y: auto; padding: 22px 24px 32px; }
+.db { flex: 1; overflow-y: auto; padding: 22px 24px 32px; --table-top: 0px; }
 .df { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 24px; border-top: 1px solid var(--line); background: var(--bg-elev); flex-wrap: wrap; }
 .db { overscroll-behavior: contain; min-width: 0; overflow-x: hidden; }
 @media (max-width: 560px) {
   .sheet { border-left: 0; }
-  .dh { padding: 16px 16px 14px; flex-wrap: wrap; }
+  .dh { padding: max(16px, calc(var(--wc-h) + 8px)) 16px 14px; flex-wrap: wrap; }
   /* the title gets the whole first line; any header actions drop under it */
   .dh > .grow { flex: 1 1 calc(100% - 100px); }
   .dh > :deep(.btn) { order: 1; }

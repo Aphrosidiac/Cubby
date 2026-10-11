@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends Record<string, any>">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from './Icon.vue';
 import type { Column } from './types';
 
@@ -16,7 +16,14 @@ const sorted = computed(() => {
   const r = props.rows ?? [];
   if (!sort.value) return r;
   const { key, dir } = sort.value;
-  return [...r].sort((a, b) => { const x = a[key], y = b[key]; return (x > y ? 1 : x < y ? -1 : 0) * dir; });
+  // empty values sink to the bottom either way; text compares like a person reads it ("Item 2" < "Item 10")
+  const empty = (v: unknown) => v === null || v === undefined || v === '';
+  return [...r].sort((a, b) => {
+    const x = a[key], y = b[key];
+    if (empty(x) || empty(y)) return empty(x) === empty(y) ? 0 : empty(x) ? 1 : -1;
+    const c = typeof x === 'string' && typeof y === 'string' ? x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' }) : x > y ? 1 : x < y ? -1 : 0;
+    return c * dir;
+  });
 });
 // Where each column sits when the table folds into cards on a phone.
 const roles = computed(() => {
@@ -47,15 +54,28 @@ watch(() => props.rows, rows => {
   first = false;
   if (next.size) { flashing.value = next; setTimeout(() => { flashing.value = new Set(); }, 1700); }
 }, { immediate: true });
+
+// The wrapper only becomes a sideways scroller when the table is wider than it. A scroll
+// container would capture the sticky header (it could never stick to the page) and clip
+// row menus that open past the last row.
+const wrap = ref<HTMLElement | null>(null);
+const tbl = ref<HTMLElement | null>(null);
+const scrolls = ref(false);
+let ro: ResizeObserver | null = null;
+const fit = () => { if (wrap.value && tbl.value) scrolls.value = tbl.value.scrollWidth > wrap.value.clientWidth + 1; };
+onMounted(() => { ro = new ResizeObserver(fit); if (wrap.value) ro.observe(wrap.value); if (tbl.value) ro.observe(tbl.value); fit(); });
+onBeforeUnmount(() => ro?.disconnect());
 </script>
 
 <template>
-  <div class="ff-table" :class="{ dense }">
-    <table>
+  <div ref="wrap" class="ff-table" :class="{ dense, scrolls }">
+    <table ref="tbl">
       <thead>
         <tr>
-          <th v-for="c in columns" :key="c.key" :style="{ width: c.width, textAlign: c.align ?? 'left' }" :class="[c.class, { sortable: c.sortable, 'hide-sm': c.hideSm }]" @click="toggleSort(c)">
-            <span class="th">{{ c.label }}<Icon v-if="sort?.key === c.key" :name="sort.dir === 1 ? 'chevron-down' : 'chevron-down'" :size="11" :class="{ up: sort.dir === -1 }" /></span>
+          <th v-for="c in columns" :key="c.key" :style="{ width: c.width, textAlign: c.align ?? 'left' }" :class="[c.class, { sortable: c.sortable, 'hide-sm': c.hideSm }]"
+            :aria-sort="c.sortable ? (sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none') : undefined">
+            <button v-if="c.sortable" type="button" class="th" :title="`Sort by ${c.label.toLowerCase()}`" @click="toggleSort(c)">{{ c.label }}<Icon name="chevron-down" :size="11" class="sort-i" :class="{ on: sort?.key === c.key, up: sort?.key === c.key && sort.dir === -1 }" /></button>
+            <span v-else class="th">{{ c.label }}</span>
           </th>
           <th v-if="clickable" class="arrow-col" aria-hidden="true" />
         </tr>
@@ -70,7 +90,7 @@ watch(() => props.rows, rows => {
         <tr
           v-for="(r, i) in sorted" :key="String(r[rowKey])" :style="{ '--i': Math.min(i, 14) }"
           :class="{ clickable, flash: flashing.has(String(r[rowKey])), sel: selected === String(r[rowKey]) }" class="row-in"
-          :tabindex="clickable ? 0 : undefined" @click="clickable && emit('row-click', r, $event)" @keydown.enter="clickable && emit('row-click', r, $event as unknown as MouseEvent)"
+          :tabindex="clickable ? 0 : undefined" @click="clickable && emit('row-click', r, $event)" @keydown.enter.self="clickable && emit('row-click', r, $event as unknown as MouseEvent)"
         >
           <td v-for="c in columns" :key="c.key" :style="{ textAlign: c.align ?? 'left' }" :class="cellClass(c)">
             <slot :name="`cell-${c.key}`" :row="r" :value="r[c.key]">{{ r[c.key] ?? '—' }}</slot>
@@ -84,11 +104,20 @@ watch(() => props.rows, rows => {
 </template>
 
 <style scoped>
-.ff-table { width: 100%; overflow-x: auto; }
+.ff-table { width: 100%; }
+.ff-table.scrolls { overflow-x: auto; }
 table { width: 100%; border-collapse: separate; border-spacing: 0; }
-th { position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 10px 14px; border-bottom: 1px solid var(--fg); font-family: var(--mono); font-size: var(--fs-2xs); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; text-align: left; }
-th.sortable { cursor: pointer; } th.sortable:hover { color: var(--fg); }
-.th { display: inline-flex; align-items: center; gap: 4px; }
+/* sticks under the app's top bar; a drawer or modal body resets --table-top to 0 */
+th { position: sticky; top: var(--table-top, var(--topbar)); z-index: 2; background: var(--table-bg, var(--bg)); padding: 10px 14px; border-bottom: 1px solid var(--fg); font-family: var(--mono); font-size: var(--fs-2xs); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; text-align: left; }
+.th { display: inline-flex; align-items: center; gap: 4px; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
+button.th { cursor: pointer; padding: 2px 0; margin: -2px 0; border-radius: var(--r-sm); transition: color var(--t-micro); }
+button.th:hover, th[aria-sort='ascending'] .th, th[aria-sort='descending'] .th { color: var(--fg); }
+button.th:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; box-shadow: none; }
+th[style*='right'] .th { flex-direction: row-reverse; }
+/* the sort chevron hints on hover, shows when the column is sorted */
+.sort-i { opacity: 0; transition: opacity var(--t-micro), transform 240ms var(--ease-out); }
+button.th:hover .sort-i, button.th:focus-visible .sort-i { opacity: .45; }
+.sort-i.on { opacity: 1 !important; }
 .up { transform: rotate(180deg); }
 td { padding: 13px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; font-size: var(--fs-base); transition: background-color 180ms; }
 .dense td { padding: 9px 14px; font-size: var(--fs-base); }

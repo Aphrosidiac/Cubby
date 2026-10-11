@@ -1,6 +1,8 @@
 // Activity rows store the command name (posts.create, brands.open.failed …) plus a redacted input.
 // These turn them into a sentence and a one-line detail a person can scan.
-import type { Activity } from '@shared/types';
+import type { Activity, Platform } from '@shared/types';
+import { platformName } from '@shared/platforms';
+import { dateTime, plural } from '@/lib/format';
 
 const VERBS: Record<string, string> = {
   'app.killSwitch': 'Kill switch',
@@ -22,8 +24,21 @@ const VERBS: Record<string, string> = {
   'flows.create': 'Created flow', 'flows.update': 'Edited flow', 'flows.delete': 'Deleted flow', 'flows.duplicate': 'Duplicated flow', 'flows.run': 'Ran flow',
   'flows.runRecipe': 'Ran recipe', 'flows.recordStart': 'Started recording', 'flows.recordStop': 'Stopped recording', 'runs.abort': 'Aborted run',
   'tokens.create': 'Created API token', 'tokens.revoke': 'Revoked API token', 'claude.connect': 'Connected Claude Code',
-  'backup.run': 'Backed up', 'backup.restore': 'Restored a backup', 'transfer.export': 'Exported brands', 'transfer.import': 'Imported brands',
-  'guardrail.checkpoint': 'Stopped at a checkpoint'
+  'activity.exportCsv': 'Exported activity', 'backup.run': 'Backed up', 'backup.restore': 'Restored a backup', 'transfer.export': 'Exported brands', 'transfer.import': 'Imported brands',
+  'guardrail.checkpoint': 'Stopped at a checkpoint', 'guardrail.off_limits': 'Refused an off-limits page',
+  // logged by the scheduler, MCP and pacing rather than a command
+  'flow.scheduled_run': 'Ran scheduled flow', 'mcp.connected': 'Claude connected', 'mcp.brandSwitch': 'Switched brand',
+  'posts.missed': 'Missed a scheduled post', 'posts.repaced': 'Moved a post to keep pacing', 'posts.submit': 'Submitted post',
+  // read-only commands appear only when a guardrail refused them
+  'browser.snapshot': 'Read the page', 'browser.screenshot': 'Took a screenshot', 'browser.pageText': 'Read the page text', 'browser.tabs': 'Listed tabs',
+  'browser.waitFor': 'Waited for the page', 'brands.front': 'Brought brand to front', 'brands.list': 'Listed brands', 'brands.get': 'Looked up brand',
+  'posts.list': 'Listed posts', 'media.list': 'Searched media', 'flows.list': 'Listed flows', 'activity.list': 'Read activity'
+};
+
+/** GuardrailError rules (core) → what stopped the action. */
+const RULES: Record<string, string> = {
+  off_limits: 'Off-limits page', brand_lock: 'Brand lock', kill_switch: 'Kill switch', checkpoint: 'Checkpoint',
+  handle_check: 'Wrong account', no_secrets: 'Secrets withheld', pacing: 'Pacing', unsupported: 'Not supported'
 };
 
 export function humanAction(a: Pick<Activity, 'action' | 'detail'>): { text: string; failed: boolean; guard: boolean } {
@@ -36,28 +51,44 @@ export function humanAction(a: Pick<Activity, 'action' | 'detail'>): { text: str
     const [mod, verb = ''] = base.split('.');
     text = `${mod.charAt(0).toUpperCase()}${mod.slice(1)} · ${verb.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toLowerCase()}`;
   }
+  // a guardrail refusal reads "Blocked: navigated" (the detail line names the guardrail)
+  if (failed && guard) return { text: `Blocked: ${text.charAt(0).toLowerCase()}${text.slice(1)}`, failed, guard };
   return { text: failed ? `Failed: ${text.charAt(0).toLowerCase()}${text.slice(1)}` : text, failed, guard };
 }
 
+/** quietHours → "quiet hours" */
+const words = (k: string) => k.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase();
 const pick = (o: unknown, k: string): unknown => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined);
 
 /** A short line from the redacted input / error: the caption, the URL, the name — whatever identifies it. */
 export function detailLine(a: Pick<Activity, 'action' | 'detail'>): string {
   const d = a.detail ?? {};
   const err = pick(d, 'error');
-  if (typeof err === 'string') return err;
+  const rule = pick(d, 'rule');
+  const label = typeof rule === 'string' ? RULES[rule] : undefined;
+  if (typeof err === 'string') return label && !err.toLowerCase().startsWith(label.toLowerCase()) ? `${label} · ${err}` : err;
   const input = pick(d, 'input');
   for (const k of ['name', 'caption', 'url', 'handle', 'message', 'recipe', 'path', 'reason', 'scheduledAt', 'key', 'value', 'mode']) {
     const v = pick(input, k);
-    if (typeof v === 'string' && v.trim()) return `${k === 'scheduledAt' ? 'for ' : ''}${v.length > 120 ? `${v.slice(0, 120)}…` : v}`;
+    if (typeof v !== 'string' || !v.trim()) continue;
+    // a timestamp reads as wall time in the person's zone ("for 12 Oct, 8:00 pm"), never raw ISO
+    if (k === 'scheduledAt') return `for ${dateTime(v)}`;
+    return v.length > 120 ? `${v.slice(0, 120)}…` : v;
   }
   const patch = pick(input, 'patch');
-  if (patch && typeof patch === 'object') return `changed ${Object.keys(patch).join(', ')}`;
+  if (patch && typeof patch === 'object') return `changed ${Object.keys(patch).map(words).join(', ')}`;
   const ids = pick(input, 'ids');
-  if (Array.isArray(ids)) return `${ids.length} item${ids.length === 1 ? '' : 's'}`;
+  if (Array.isArray(ids)) return plural(ids.length, 'item');
   const paths = pick(input, 'paths');
-  if (Array.isArray(paths)) return `${paths.length} file${paths.length === 1 ? '' : 's'}`;
+  if (Array.isArray(paths)) return plural(paths.length, 'file');
   const reason = pick(d, 'reason');
   if (typeof reason === 'string') return reason;
+  // rows written by the scheduler / MCP carry their facts at the top level
+  const platform = pick(d, 'platform'), handle = pick(d, 'handle');
+  if (typeof platform === 'string') return [platformName(platform as Platform), typeof handle === 'string' ? handle : ''].filter(Boolean).join(' · ');
+  const to = pick(d, 'to');
+  if (typeof to === 'string') { const from = pick(d, 'from'); return typeof from === 'string' ? `${from} → ${to}` : `to ${to}`; }
+  const via = pick(d, 'via');
+  if (typeof via === 'string') return `token “${via}”`;
   return '';
 }

@@ -15,7 +15,7 @@ import { detailLine, humanAction } from '@/components/activity/humanize';
 import { brandById, useBrands } from '@/components/posts/meta';
 import { fmtStamp, tz } from '@/components/posts/time';
 import { api, fileUrl, on } from '@/lib/api';
-import { ago } from '@/lib/format';
+import { ago, plural } from '@/lib/format';
 import { fail, toast } from '@/composables/toast';
 
 const brands = useBrands();
@@ -68,11 +68,13 @@ watch(sentinel, (el, old) => { if (old) io?.unobserve(old); if (el) io?.observe(
 
 // live: new rows that match the filters slide in at the top
 const fresh = ref(new Set<number>());
+// the same rule the server applies: `action` is a prefix, `*` a wildcard ("posts.*.failed")
+const actionRe = (s: string) => new RegExp(`^${s.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}`, 'i');
 function matches(a: Activity) {
   const f = filters();
   if (f.brandId && a.brandId !== f.brandId) return false;
   if (f.actor && a.actor !== f.actor) return false;
-  if (f.action && !a.action.includes(f.action)) return false;
+  if (f.action && !actionRe(f.action).test(a.action)) return false;
   if (f.q && !JSON.stringify([a.action, a.brandName, a.detail]).toLowerCase().includes(f.q.toLowerCase())) return false;
   return true;
 }
@@ -82,11 +84,18 @@ const off = on('activity.new', a => {
   fresh.value = new Set([...fresh.value, a.id]);
   setTimeout(() => { const s = new Set(fresh.value); s.delete(a.id); fresh.value = s; }, 1800);
 });
-onBeforeUnmount(() => { off(); io?.disconnect(); });
+// "just now" ages into "2 minutes ago" without a reload
+const tick = ref(0);
+const clock = window.setInterval(() => tick.value++, 30_000);
+const rel = (iso: string) => { void tick.value; return ago(iso); };
+onBeforeUnmount(() => { off(); io?.disconnect(); clearInterval(clock); });
 
 const open = ref(new Set<number>());
 const toggle = (id: number) => { const s = new Set(open.value); s.has(id) ? s.delete(id) : s.add(id); open.value = s; };
-const zoomImgs = computed(() => rows.value.filter(r => r.screen).map(r => ({ path: r.screen!, label: `${humanAction(r).text} · ${fmtStamp(r.at)}` })));
+// screenshots whose file has been deleted: a quiet placeholder instead of a broken image
+const gone = ref(new Set<number>());
+const missing = (id: number) => { gone.value = new Set([...gone.value, id]); };
+const zoomImgs = computed(() => rows.value.filter(r => r.screen && !gone.value.has(r.id)).map(r => ({ path: r.screen!, label: `${humanAction(r).text} · ${fmtStamp(r.at)}` })));
 const zoom = ref<number | null>(null);
 const zoomOf = (p: string) => (zoom.value = zoomImgs.value.findIndex(z => z.path === p));
 
@@ -94,8 +103,9 @@ const exporting = ref(false);
 async function exportCsv() {
   exporting.value = true;
   try {
-    const r = await api('activity.exportCsv', { brandId: brand.value ?? undefined, actor: actor.value ?? undefined });
-    toast(`Exported ${r.count} rows`, { tone: 'good', body: r.path, action: { label: 'Show file', run: () => void api('app.revealPath', { path: r.path }).catch(e => fail(e)) } });
+    // the file holds exactly what the filters show
+    const r = await api('activity.exportCsv', filters());
+    toast(`Exported ${plural(r.count, 'row')}`, { tone: 'good', body: r.path, action: { label: 'Show file', run: () => void api('app.revealPath', { path: r.path }).catch(e => fail(e)) } });
   } catch (e) { fail(e, 'Could not export'); }
   finally { exporting.value = false; }
 }
@@ -111,8 +121,8 @@ const dayOf = (iso: string) => new Date(iso).toLocaleDateString('en-MY', { weekd
 <template>
   <div class="page activity">
     <PageHeader eyebrow="Control" title="Activity">
-      <span>Everything done by you, Claude, the scheduler, flows and the API — append-only.</span>
-      <template #actions><Btn icon="download" :loading="exporting" @click="exportCsv">Export CSV</Btn></template>
+      <span>Everything done by you, Claude, the scheduler, flows and the API — append&#8209;only.</span>
+      <template #actions><Btn icon="download" :loading="exporting" :disabled="!loading && !rows.length" :title="!loading && !rows.length ? 'Nothing to export' : 'Export what the filters show as a CSV file'" @click="exportCsv">Export CSV</Btn></template>
     </PageHeader>
 
     <div class="toolbar">
@@ -134,19 +144,20 @@ const dayOf = (iso: string) => new Date(iso).toLocaleDateString('en-MY', { weekd
       <template v-for="(r, i) in rows" :key="r.id">
         <div v-if="i === 0 || dayOf(rows[i - 1].at) !== dayOf(r.at)" class="day label">{{ dayOf(r.at) }}</div>
         <div class="tr" :class="{ fresh: fresh.has(r.id), opened: open.has(r.id), failed: humanAction(r).failed, guard: humanAction(r).guard }" role="row">
-          <span class="time small num" :title="fmtStamp(r.at)">{{ ago(r.at) }}</span>
+          <span class="time small num" :title="fmtStamp(r.at)">{{ rel(r.at) }}</span>
           <span><ActorChip :actor="r.actor" /></span>
           <span class="brand small">
-            <template v-if="r.brandId"><BrandAvatar :brand="brandById(r.brandId) ?? { name: r.brandName ?? '?' }" :size="18" /><span class="ellipsis">{{ r.brandName ?? brandById(r.brandId)?.name ?? '—' }}</span></template>
-            <span v-else class="faint">—</span>
+            <template v-if="r.brandId"><BrandAvatar :brand="brandById(r.brandId) ?? { name: r.brandName ?? '?' }" :size="18" /><span class="ellipsis" :title="r.brandName ?? brandById(r.brandId)?.name">{{ r.brandName ?? brandById(r.brandId)?.name ?? 'Deleted brand' }}</span></template>
+            <span v-else class="muted" aria-label="No brand">—</span>
           </span>
-          <button type="button" class="what" :aria-expanded="open.has(r.id)" @click="toggle(r.id)">
-            <span class="act small"><Icon v-if="humanAction(r).guard" name="shield" :size="13" class="gi" />{{ humanAction(r).text }}</span>
-            <span class="det tiny ellipsis">{{ detailLine(r) }}</span>
+          <button type="button" class="what" :aria-expanded="open.has(r.id)" :aria-label="`${humanAction(r).text}${detailLine(r) ? ` — ${detailLine(r)}` : ''}. Show details`" @click="toggle(r.id)">
+            <span class="act small ellipsis"><Icon v-if="humanAction(r).guard" name="shield" :size="13" class="gi" />{{ humanAction(r).text }}</span>
+            <span v-if="detailLine(r)" class="det tiny ellipsis" :title="detailLine(r).length > 60 ? detailLine(r) : undefined">{{ detailLine(r) }}</span>
           </button>
           <span class="end">
-            <button v-if="r.screen" type="button" class="thumb" :aria-label="'Open screenshot'" @click="zoomOf(r.screen)"><img :src="fileUrl(r.screen)" alt="" loading="lazy" /></button>
-            <Icon name="chevron-down" :size="14" class="chev" :class="{ rot: open.has(r.id) }" />
+            <span v-if="r.screen && gone.has(r.id)" class="thumb gone" title="Screenshot file is missing"><Icon name="image" :size="14" /></span>
+            <button v-else-if="r.screen" type="button" class="thumb" aria-label="Open screenshot" title="Open screenshot" @click="zoomOf(r.screen)"><img :src="fileUrl(r.screen)" alt="" loading="lazy" @error="missing(r.id)" /></button>
+            <button type="button" class="exp" :aria-label="open.has(r.id) ? 'Hide details' : 'Show details'" :title="open.has(r.id) ? 'Hide details' : 'Show details'" :aria-expanded="open.has(r.id)" tabindex="-1" @click="toggle(r.id)"><Icon name="chevron-down" :size="14" class="chev" :class="{ rot: open.has(r.id) }" /></button>
           </span>
         </div>
         <div v-if="open.has(r.id)" class="json">
@@ -156,7 +167,7 @@ const dayOf = (iso: string) => new Date(iso).toLocaleDateString('en-MY', { weekd
       </template>
       <div ref="sentinel" class="sent">
         <span v-if="more" class="tiny muted row gap-2"><span class="spin" />Loading older…</span>
-        <span v-else-if="end" class="tiny faint">That’s everything{{ filtered ? ' that matches' : '' }}.</span>
+        <span v-else-if="end" class="tiny muted">That’s everything{{ filtered ? ' that matches' : '' }} · {{ plural(rows.length, 'entry', 'entries') }}</span>
         <button v-else type="button" class="tiny link muted" @click="loadMore">Load older</button>
       </div>
     </div>
@@ -167,9 +178,11 @@ const dayOf = (iso: string) => new Date(iso).toLocaleDateString('en-MY', { weekd
 
 <style scoped>
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: var(--s5); }
-.search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); width: min(260px, 100%); }
-.search.narrow { width: 200px; }
-.search:focus-within { border-color: var(--focus-border); }
+/* the two text filters give way first, so the whole toolbar holds one line at the minimum window */
+.search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); flex: 1 1 160px; max-width: 280px; min-width: 140px; transition: border-color var(--t-micro), box-shadow var(--t-micro); }
+.search.narrow { flex: 0 1 190px; min-width: 150px; }
+.search:hover { border-color: var(--line-strong); }
+.search:focus-within { border-color: var(--focus-border); box-shadow: var(--focus-ring); color: var(--fg); }
 .search input { flex: 1; border: 0; background: none; outline: none; color: var(--fg); min-width: 0; }
 .search input:focus-visible { box-shadow: none; outline: none; }
 .code-in { font-family: var(--mono); font-size: var(--fs-xs); }
@@ -185,13 +198,17 @@ const dayOf = (iso: string) => new Date(iso).toLocaleDateString('en-MY', { weekd
 .gi { display: inline; vertical-align: -2px; margin-right: 5px; }
 .time { color: var(--muted); white-space: nowrap; }
 .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.what { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; text-align: left; padding: 2px 0; }
-.act { font-weight: 500; }
+.what { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; text-align: left; padding: 2px 0; border-radius: var(--r); }
+.act { font-weight: 500; max-width: 100%; }
 .det { color: var(--muted); max-width: 100%; }
 .end { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.thumb { border-radius: 4px; }
 .thumb img { width: 44px; height: 30px; object-fit: cover; object-position: top; border-radius: 4px; border: 1px solid var(--line); }
 .thumb:hover img { border-color: var(--fg); }
-.chev { color: var(--faint); transition: transform 240ms var(--ease-out); }
+.thumb.gone { display: grid; place-items: center; width: 44px; height: 30px; border: 1px dashed var(--line-strong); color: var(--muted); }
+.exp { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--muted); transition: background-color var(--t-micro), color var(--t-micro); }
+.exp:hover { background: var(--panel-2); color: var(--fg); }
+.chev { transition: transform 240ms var(--ease-out); }
 .rot { transform: rotate(180deg); }
 .json { padding: 10px 14px 14px; border-bottom: 1px solid var(--line-soft); background: var(--panel); }
 .json pre { margin: 0; white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; color: var(--fg-2); font-size: var(--fs-xs); }

@@ -2,6 +2,11 @@
 :root {
   --sidebar: 228px;
   --topbar: 56px;
+  /* Windows draws its min / max / close buttons over the top-right of the window
+     (titleBarOverlay). These are that area's size — 0 on macOS and anywhere without the
+     overlay — so top-right content (top bar, drawer and modal headers) can stay clear of it. */
+  --wc-h: env(titlebar-area-height, 0px);
+  --wc-w: max(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)));
 }
 
 /* status dots used across Brands, tray-like chips and the switcher */
