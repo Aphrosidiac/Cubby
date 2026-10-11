@@ -44,10 +44,6 @@ export function notify(n: NotifyInput): void {
   }
   const { telegramBotToken: tok, telegramChatId: chat } = s.notifications
   if (tok && chat) {
-    fetch(`https://api.telegram.org/bot${tok}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: chat, text: `${n.title}\n${n.body}` })
-    }).catch(() => {})
+    sendTelegram(tok, chat, `${n.title}\n${n.body}`).catch((e) => console.warn('telegram notification failed:', (e as Error).message))
   }
 }
