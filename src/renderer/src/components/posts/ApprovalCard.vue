@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import type { MediaAsset, Post } from '@shared/types';
+import type { MediaAsset, Platform, Post } from '@shared/types';
+import { PLATFORM_SPECS } from '@shared/platforms';
 import Btn from '@/components/ui/Btn.vue';
 import Icon from '@/components/ui/Icon.vue';
 import PlatformIcon from '@/components/common/PlatformIcon.vue';
@@ -15,7 +16,7 @@ import { fmtWhen } from './time';
 
 /** One prepared post waiting for a yes: caption, media, and per account the screenshot of the filled composer. */
 const props = defineProps<{ post: Post; media: Map<string, MediaAsset>; selected: boolean }>();
-const emit = defineEmits<{ 'update:selected': [v: boolean]; done: [] }>();
+const emit = defineEmits<{ 'update:selected': [v: boolean]; done: []; picked: [accountIds: string[]] }>();
 const router = useRouter();
 const busy = ref<string | null>(null);
 const zoom = ref<number | null>(null);
@@ -31,12 +32,18 @@ const images = computed(() => accounts.value.filter(a => a.screen).map(a => ({ p
 const zoomFor = (path: string) => (zoom.value = images.value.findIndex(i => i.path === path));
 const assets = computed(() => props.post.assetIds.map(id => props.media.get(id)).filter((a): a is MediaAsset => !!a));
 const long = computed(() => props.post.caption.length > 220);
+/** platforms on this post that use their own caption (shown, so the approver reads what will really go out) */
+const overrides = computed(() => Object.entries(props.post.perPlatform ?? {})
+  .filter(([p, o]) => o?.caption?.trim() && accounts.value.some(a => a.platform === p))
+  .map(([p, o]) => ({ platform: p as Platform, name: PLATFORM_SPECS[p as Platform]?.name ?? p, caption: o!.caption!.trim() })));
 
 // Approving a subset publishes to those accounts only; the rest of the post is dropped for them.
 const picked = ref<string[]>([]);
 watch(() => props.post.accountIds.join(), () => (picked.value = [...props.post.accountIds]), { immediate: true });
 const togglePick = (id: string) => { picked.value = picked.value.includes(id) ? picked.value.filter(x => x !== id) : [...picked.value, id]; };
 const partial = computed(() => picked.value.length < props.post.accountIds.length);
+// the page's batch approve uses the same picks as this card's own button
+watch(picked, v => emit('picked', props.post.accountIds.filter(id => v.includes(id))), { immediate: true });
 async function approve() {
   if (!picked.value.length) return;
   const accountIds = partial.value ? props.post.accountIds.filter(id => picked.value.includes(id)) : undefined;
@@ -56,7 +63,7 @@ async function reject() {
   const reason = await confirm({ title: 'Reject this post?', body: 'It goes back to draft so it can be edited; nothing is posted.', confirm: 'Reject', danger: true, input: { label: 'Reason (optional)', placeholder: 'e.g. wrong cover, typo in caption', required: false, multiline: true } });
   if (reason === null) return;
   busy.value = 'reject';
-  try { await api('posts.reject', { id: props.post.id, reason: reason || undefined }); ok('Rejected'); emit('done'); }
+  try { await api('posts.reject', { id: props.post.id, reason: reason || undefined }); ok('Rejected', 'It is a draft again — edit it and send it again from the composer.'); emit('done'); }
   catch (e) { fail(e, 'Could not reject'); }
   finally { busy.value = null; }
 }
@@ -68,7 +75,7 @@ async function reject() {
       <label class="cb"><input type="checkbox" :checked="selected" :aria-label="`Select post for ${brand?.name}`" @change="emit('update:selected', ($event.target as HTMLInputElement).checked)" /></label>
       <div class="grow">
         <div class="row gap-2 wrap">
-          <span class="strong">{{ post.scheduledAt ? fmtWhen(post.scheduledAt) : 'As soon as approved' }}</span>
+          <span class="strong" :title="post.scheduledAt ? 'Goes out at this time once approved' : 'No time set — goes out as soon as it is approved and pacing allows'">{{ post.scheduledAt ? fmtWhen(post.scheduledAt) : 'As soon as approved' }}</span>
           <span class="kind mono">{{ KIND_LABEL[post.kind] }}</span>
         </div>
         <div class="tiny muted">{{ accounts.length }} {{ accounts.length === 1 ? 'account' : 'accounts' }} · prepared {{ ago(post.updatedAt) }}</div>
@@ -76,7 +83,7 @@ async function reject() {
       <div class="acts">
         <Btn size="sm" variant="subtle" :loading="busy === 'reject'" @click="reject">Reject</Btn>
         <Btn size="sm" icon="edit" @click="router.push({ path: '/compose', query: { post: post.id } })">Edit</Btn>
-        <Btn size="sm" variant="signal" icon="check" :loading="busy === 'all'" :disabled="!picked.length" @click="approve()">{{ partial ? `Approve ${picked.length} of ${post.accountIds.length}` : 'Approve all' }}</Btn>
+        <Btn size="sm" variant="signal" icon="check" :loading="busy === 'all'" :disabled="!picked.length" @click="approve()">{{ !picked.length ? 'Pick an account' : partial ? `Approve ${picked.length} of ${post.accountIds.length}` : 'Approve all' }}</Btn>
       </div>
     </header>
 
@@ -84,6 +91,10 @@ async function reject() {
       <div class="content">
         <p class="cap pre small" :class="{ clamp: long && !expanded }">{{ post.caption || 'No caption.' }}</p>
         <button v-if="long" type="button" class="more tiny" @click="expanded = !expanded">{{ expanded ? 'Show less' : 'Show all' }}</button>
+        <div v-for="o in overrides" :key="o.platform" class="ovr">
+          <div class="tiny muted row gap-1"><PlatformIcon :platform="o.platform" :size="12" colored />{{ o.name }} uses its own caption</div>
+          <p class="cap pre small clamp">{{ o.caption }}</p>
+        </div>
         <div v-if="assets.length" class="media">
           <img v-for="a in assets.slice(0, 6)" :key="a.id" :src="fileUrl(a.thumb)" :alt="a.filename" :title="a.filename" />
           <span v-if="assets.length > 6" class="morem num">+{{ assets.length - 6 }}</span>
@@ -114,14 +125,18 @@ async function reject() {
 .card { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; transition: border-color 200ms, box-shadow 200ms; container-type: inline-size; }
 .card.sel { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg); }
 .ch { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line-soft); flex-wrap: wrap; }
+.cb { display: grid; place-items: center; width: 28px; height: 28px; margin: -6px; border-radius: 6px; cursor: pointer; }
+.cb:hover { background: var(--panel-2); }
 .cb input { width: 16px; height: 16px; accent-color: var(--fg); cursor: pointer; }
-.kind { padding: 2px 7px; border-radius: 4px; background: var(--panel-2); color: var(--fg-2); }
+.kind { padding: 2px 7px; border-radius: 4px; background: var(--panel-2); color: var(--fg-2); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .04em; }
 .acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px; }
 @container (min-width: 720px) { .body { grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr); } }
 .cap { line-height: 1.5; color: var(--fg-2); overflow-wrap: anywhere; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
 .more { color: var(--muted); margin-top: 4px; } .more:hover { color: var(--fg); }
+.ovr { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.ovr .cap { margin-top: 4px; }
 .media { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
 .media img { width: 56px; height: 56px; border-radius: 4px; object-fit: cover; background: var(--panel-2); }
 .morem { font-size: var(--fs-xs); color: var(--muted); }

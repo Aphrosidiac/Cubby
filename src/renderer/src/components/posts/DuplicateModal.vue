@@ -33,6 +33,7 @@ watch(brandId, async id => {
   chosen.value = accounts.value.filter(a => props.platforms.includes(a.platform) && supports(a.platform)).map(a => a.id);
 });
 const same = computed(() => brandId.value && brandId.value === props.fromBrandId);
+const unavailable = computed<Record<string, string>>(() => Object.fromEntries(accounts.value.filter(a => !PLATFORM_SPECS[a.platform]?.kinds.includes(props.content.kind)).map(a => [a.id, `${PLATFORM_SPECS[a.platform]?.name ?? a.platform} has no ${props.content.kind} posts`])));
 
 async function create() {
   if (!brandId.value || !chosen.value.length) return;
@@ -50,10 +51,11 @@ async function create() {
 <template>
   <Modal :open="open" title="Duplicate to brand" eyebrow="Composer" @update:open="emit('update:open', $event)">
     <p class="small muted">Creates a separate draft in the other brand with the same caption, media and options. It is paced and approved on its own.</p>
+    <p v-if="!content.caption.trim() && !content.assetIds.length" class="tiny muted mt-2">This post has no caption or media yet — the copy starts empty too.</p>
     <Field label="Brand" class="mt-4"><BrandPicker v-model="brandId" placeholder="Choose the brand…" /></Field>
     <p v-if="same" class="tiny muted mt-2">That's the brand this post is already in — you'll get a second copy.</p>
     <Field v-if="brandId" label="Accounts" class="mt-4" :hint="accounts.length ? undefined : 'This brand has no accounts yet.'">
-      <AccountChips v-model="chosen" :accounts="accounts" />
+      <AccountChips v-model="chosen" :accounts="accounts" :unavailable="unavailable" />
     </Field>
     <template #footer>
       <Btn variant="subtle" @click="emit('update:open', false)">Cancel</Btn>

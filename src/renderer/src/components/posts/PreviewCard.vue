@@ -35,7 +35,7 @@ const h = computed(() => (props.handle.startsWith('@') ? props.handle.slice(1) :
       <span v-if="assets.length > 1" class="multi num">1/{{ assets.length }}</span>
       <span v-if="first?.kind === 'video' && !vertical" class="play"><Icon name="play" :size="16" /></span>
       <div v-if="vertical" class="overlay">
-        <div class="row gap-2"><span class="av sm" :style="{ background: brand?.color }">{{ initials(brand?.name) }}</span><span class="nm">{{ h || brand?.name }}</span></div>
+        <div class="row gap-2"><span class="av sm" :style="{ background: brand?.logo ? undefined : brand?.color }"><img v-if="brand?.logo" :src="brand.logo" alt="" /><template v-else>{{ initials(brand?.name) }}</template></span><span class="nm">{{ h || brand?.name }}</span></div>
         <p class="cap pre">{{ clip || 'Your caption shows here.' }}</p>
       </div>
       <PlatformIcon v-if="vertical" :platform="platform" :size="16" class="corner" />
@@ -59,7 +59,7 @@ const h = computed(() => (props.handle.startsWith('@') ? props.handle.slice(1) :
 .p-instagram .media { aspect-ratio: 4 / 5; }
 .vertical .media { aspect-ratio: 9 / 16; max-height: 420px; margin: 0 auto; }
 .media img { width: 100%; height: 100%; object-fit: cover; }
-.ph { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #75736b; }
+.ph { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #a19e94; }
 .multi { position: absolute; top: 8px; right: 8px; padding: 1px 7px; border-radius: 9px; background: rgb(11 11 10 / .7); color: #fff; font-size: var(--fs-2xs); }
 .play { position: absolute; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgb(11 11 10 / .6); color: #fff; }
 .overlay { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 12px 14px; background: linear-gradient(transparent, rgb(0 0 0 / .75)); color: #fff; display: flex; flex-direction: column; gap: 6px; }

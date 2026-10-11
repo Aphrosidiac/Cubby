@@ -35,6 +35,10 @@ const groups = computed(() => {
 });
 
 const selected = ref<string[]>([]);
+/** per post, the accounts ticked on its card (all of them unless the person unticked some) */
+const picks = ref(new Map<string, string[]>());
+const setPicks = (p: Post, ids: string[]) => { const m = new Map(picks.value); m.set(p.id, ids); picks.value = m; };
+const partialOf = (id: string) => { const p = data.value?.find(x => x.id === id); const ids = picks.value.get(id); return p && ids && ids.length < p.accountIds.length ? ids : undefined; };
 watch(data, d => { const ids = new Set((d ?? []).map(p => p.id)); selected.value = selected.value.filter(id => ids.has(id)); });
 const setSel = (id: string, v: boolean) => { selected.value = v ? [...new Set([...selected.value, id])] : selected.value.filter(x => x !== id); };
 const groupAll = (posts: Post[]) => posts.every(p => selected.value.includes(p.id));
@@ -44,12 +48,15 @@ const batching = ref(false);
 async function approveSelected() {
   const ids = [...selected.value];
   if (!ids.length) return;
-  if (!(await confirm({ title: `Approve ${ids.length} ${ids.length === 1 ? 'post' : 'posts'}?`, body: 'Each goes out at its scheduled time (or as soon as pacing allows) on every account it was prepared for.', confirm: 'Approve' }))) return;
+  const empty = ids.filter(id => picks.value.get(id)?.length === 0);
+  if (empty.length) { fail(new Error(`${empty.length === 1 ? 'One selected post has' : `${empty.length} selected posts have`} every account unticked — tick at least one, or unselect ${empty.length === 1 ? 'it' : 'them'}.`), 'Nothing to approve'); return; }
+  const partialN = ids.filter(id => partialOf(id)).length;
+  if (!(await confirm({ title: `Approve ${ids.length} ${ids.length === 1 ? 'post' : 'posts'}?`, body: `Each goes out at its scheduled time (or as soon as pacing allows) on the accounts ticked on its card${partialN ? ` — ${partialN} of them skip${partialN === 1 ? 's' : ''} some accounts` : ''}.`, confirm: 'Approve' }))) return;
   batching.value = true;
   let done = 0;
   const errors: string[] = [];
   for (const id of ids) {
-    try { await api('posts.approve', { id }); done++; } catch (e) { errors.push((e as Error).message); }
+    try { await api('posts.approve', { id, accountIds: partialOf(id) }); done++; } catch (e) { errors.push((e as Error).message); }
   }
   batching.value = false;
   selected.value = [];
@@ -63,7 +70,7 @@ async function approveSelected() {
   <div class="page approvals">
     <PageHeader eyebrow="Posting" title="Approvals">
       <span v-if="data">{{ data.length ? `${data.length} ${data.length === 1 ? 'post' : 'posts'} waiting` : 'Inbox clear' }}</span>
-      <span class="faint">Each was filled in its brand’s window and stopped before the final button.</span>
+      <span v-if="data?.length" class="muted">Each was filled in its brand’s window and stopped before the final button.</span>
       <template #actions>
         <Btn v-if="data?.length" variant="ghost" @click="selected = selected.length === data.length ? [] : data.map(p => p.id)">{{ selected.length === data.length ? 'Clear selection' : 'Select all' }}</Btn>
         <Btn v-if="selected.length" variant="signal" icon="check" :loading="batching" @click="approveSelected">Approve {{ selected.length }}</Btn>
@@ -79,11 +86,11 @@ async function approveSelected() {
     <TransitionGroup v-else tag="div" name="list" class="groups">
       <section v-for="g in groups" :key="g.brandId" class="grp">
         <div class="section-title">
-          <div class="row gap-2"><BrandAvatar :brand="g.brand ?? { name: '?' }" :size="22" /><h2 class="h3">{{ g.brand?.name ?? 'Unknown brand' }}</h2><span class="tiny muted num">{{ g.posts.length }}</span></div>
-          <button type="button" class="tiny link muted" @click="toggleGroup(g.posts)">{{ groupAll(g.posts) ? 'Unselect' : 'Select' }} these</button>
+          <div class="row gap-2 minw"><BrandAvatar :brand="g.brand ?? { name: '?' }" :size="22" /><h2 class="h3 ellipsis" :title="g.brand?.name">{{ g.brand?.name ?? 'Unknown brand' }}</h2><span class="tiny muted num">{{ g.posts.length }}</span></div>
+          <button type="button" class="small link muted" :aria-label="`${groupAll(g.posts) ? 'Unselect' : 'Select'} every post for ${g.brand?.name ?? 'this brand'}`" @click="toggleGroup(g.posts)">{{ groupAll(g.posts) ? 'Unselect these' : 'Select these' }}</button>
         </div>
         <TransitionGroup tag="div" name="list" class="cards">
-          <ApprovalCard v-for="p in g.posts" :key="p.id" :post="p" :media="media" :selected="selected.includes(p.id)" @update:selected="v => setSel(p.id, v)" @done="reload(true)" />
+          <ApprovalCard v-for="p in g.posts" :key="p.id" :post="p" :media="media" :selected="selected.includes(p.id)" @update:selected="v => setSel(p.id, v)" @picked="ids => setPicks(p, ids)" @done="reload(true)" />
         </TransitionGroup>
       </section>
     </TransitionGroup>
@@ -93,4 +100,5 @@ async function approveSelected() {
 <style scoped>
 .groups { display: flex; flex-direction: column; gap: var(--s7); }
 .cards { display: flex; flex-direction: column; gap: var(--s4); }
+.minw { min-width: 0; }
 </style>

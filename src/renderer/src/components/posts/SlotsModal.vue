@@ -61,13 +61,18 @@ async function save() {
       <template v-else>
         <p v-if="!rows.length" class="small muted">No slots yet — queued posts have nowhere to go. Add one below.</p>
         <ul class="slots">
-          <li v-for="(r, i) in rows" :key="r.k">
-            <div class="days" role="group" :aria-label="`Slot ${i + 1} days`">
-              <button v-for="(d, j) in DAYS" :key="j" type="button" :class="{ on: r.weekdays.includes(j) }" :aria-pressed="r.weekdays.includes(j)" :aria-label="DAY_NAMES[j]" :title="DAY_NAMES[j]" @click="toggleDay(r, j)">{{ d }}</button>
+          <li v-for="(r, i) in rows" :key="r.k" :class="{ invalid: !r.weekdays.length }">
+            <div class="left">
+              <div class="days" role="group" :aria-label="`Slot ${i + 1} days`">
+                <button v-for="(d, j) in DAYS" :key="j" type="button" :class="{ on: r.weekdays.includes(j) }" :aria-pressed="r.weekdays.includes(j)" :aria-label="DAY_NAMES[j]" :title="DAY_NAMES[j]" @click="toggleDay(r, j)">{{ d }}</button>
+              </div>
+              <div class="pre tiny">
+                <span v-if="!r.weekdays.length" class="err">Pick at least one day ·</span>
+                <button type="button" @click="preset(r, 'all')">Daily</button><button type="button" @click="preset(r, 'week')">Weekdays</button><button type="button" @click="preset(r, 'end')">Weekend</button>
+              </div>
             </div>
-            <div class="pre tiny"><button type="button" @click="preset(r, 'all')">Daily</button><button type="button" @click="preset(r, 'week')">Weekdays</button><button type="button" @click="preset(r, 'end')">Weekend</button></div>
-            <input v-model="r.time" type="time" class="input time" :aria-label="`Slot ${i + 1} time`" />
-            <button type="button" class="rm" :aria-label="`Remove slot ${i + 1}`" @click="rows.splice(i, 1)"><Icon name="close" :size="14" /></button>
+            <input v-model="r.time" type="time" class="input time" :aria-label="`Slot ${i + 1} time (${tzLabel()})`" />
+            <button type="button" class="rm" :aria-label="`Remove slot ${i + 1}`" :title="`Remove slot ${i + 1}`" @click="rows.splice(i, 1)"><Icon name="close" :size="14" /></button>
           </li>
         </ul>
         <Btn size="sm" icon="plus" class="mt-3" @click="add">Add slot</Btn>
@@ -81,15 +86,18 @@ async function save() {
 </template>
 
 <style scoped>
-.slots li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
+.slots li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line-soft); }
+.left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.err { color: var(--bad); }
 .slots li:first-child { border-top: 0; }
 .days { display: inline-flex; gap: 3px; }
 .days button { width: 28px; height: 28px; border-radius: 50%; font-size: var(--fs-xs); font-weight: 600; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); transition: background-color 150ms, color 150ms; }
 .days button.on { background: var(--fg); color: var(--bg); box-shadow: none; }
 .days button:hover:not(.on) { color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
-.pre { display: inline-flex; gap: 8px; color: var(--muted); }
+.pre { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--muted); }
+.pre button { color: var(--muted); }
 .pre button:hover { color: var(--fg); text-decoration: underline; }
-.time { width: 110px; min-height: 34px; padding: 5px 9px; margin-left: auto; }
+.time { width: 136px; min-height: 36px; padding: 5px 9px; }
 .rm { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
 .rm:hover { background: var(--panel-2); color: var(--bad); }
 </style>
