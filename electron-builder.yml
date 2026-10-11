@@ -8,6 +8,7 @@ files:
   - resources/**
   - package.json
   - '!**/.vscode/*'
+  - '!.claude/**'
 asarUnpack:
   - resources/**
   - node_modules/ffmpeg-static/**
@@ -15,8 +16,15 @@ asarUnpack:
 extraResources:
   - from: resources
     to: resources
+fileAssociations:
+  - ext: brand
+    name: Cubby brand export
+    description: Cubby brand export
+    icon: icon
+    role: Editor
 win:
   executableName: Cubby
+  icon: build/icon.ico
   files:
     - '!node_modules/ffprobe-static/bin/{darwin,linux}/**'
     - '!node_modules/ffprobe-static/bin/win32/ia32/**'
@@ -28,8 +36,14 @@ nsis:
   createDesktopShortcut: always
   oneClick: false
   allowToChangeInstallationDirectory: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
 mac:
   target: [dmg]
+  icon: build/icon.png
   files:
     - '!node_modules/ffprobe-static/bin/{win32,linux}/**'
   category: public.app-category.productivity

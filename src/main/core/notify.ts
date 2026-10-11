@@ -1,5 +1,6 @@
 // OS notifications (+ optional Telegram). Clicking one opens Cubby at `path`.
 import { Notification } from 'electron'
+import { resourcePath } from './resources'
 import { getSettings } from './settings'
 
 let showApp: (path?: string) => void = () => {}
@@ -18,7 +19,7 @@ export interface NotifyInput {
 export function notify(n: NotifyInput): void {
   const s = getSettings()
   if (s.notifications.os && Notification.isSupported()) {
-    const note = new Notification({ title: n.title, body: n.body, urgency: n.urgent ? 'critical' : 'normal', silent: false })
+    const note = new Notification({ title: n.title, body: n.body, icon: resourcePath('icon.png'), urgency: n.urgent ? 'critical' : 'normal', silent: false })
     note.on('click', () => showApp(n.path))
     note.show()
   }

@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "description": "Every brand gets its own cubby — sealed Chrome per brand, composer, approvals, flows, Local API + MCP.",
   "main": "./out/main/index.js",
-  "author": "FF Dev Studio",
+  "author": { "name": "FF Dev Studio", "email": "hello@ffdev.studio", "url": "https://ffdev.studio" },
+  "homepage": "https://github.com/Aphrosidiac/Cubby",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {

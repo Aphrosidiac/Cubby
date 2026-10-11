@@ -1,7 +1,7 @@
 // Tray / menu-bar icon: brands with open/close, approvals, Claude status, Stop, open app.
 import { app, Menu, nativeImage, Tray } from 'electron'
-import { join } from 'node:path'
 import { onEvent } from './core/events'
+import { resourcePath } from './core/resources'
 import { invoke } from './core/registry'
 import { runtime, setKillSwitch } from './core/runtime'
 import { buildStatus } from './modules/app'
@@ -53,7 +53,10 @@ function schedule(): void {
 }
 
 export function createTray(): void {
-  const icon = nativeImage.createFromPath(join(__dirname, '../../resources/icon.png')).resize({ width: 16, height: 16 })
+  // Windows: pixel-drawn 16 px mark (+ @2x picked up automatically); macOS: a template image the
+  // menu bar tints for light/dark
+  const icon = nativeImage.createFromPath(resourcePath(process.platform === 'darwin' ? 'trayTemplate.png' : 'tray.png'))
+  if (process.platform === 'darwin') icon.setTemplateImage(true)
   tray = new Tray(icon)
   tray.on('click', () => showMainWindow())
   rebuild()
