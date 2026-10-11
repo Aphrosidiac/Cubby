@@ -60,6 +60,7 @@ function fill(f: Flow | null) {
   if (p.kind === 'hourly') minute.value = p.minute;
   if (p.kind === 'daily' || p.kind === 'weekdays') at.value = p.time;
   if (p.kind === 'custom') cron.value = p.cron;
+  snapshot(); // same tick as the fill: "Unsaved changes" never renders while the page settles
   setTimeout(snapshot, 0);
 }
 async function load() {
@@ -70,7 +71,6 @@ async function load() {
   catch (e) { loadError.value = (e as Error).message; }
   finally { loading.value = false; }
 }
-watch(() => route.params.id, id => { if (id && route.path.startsWith('/flows/')) void load(); }, { immediate: true });
 
 const preset = computed<SchedulePreset>(() => sched.value === 'hourly' ? { kind: 'hourly', minute: minute.value } : sched.value === 'daily' ? { kind: 'daily', time: at.value } : sched.value === 'weekdays' ? { kind: 'weekdays', time: at.value } : sched.value === 'custom' ? { kind: 'custom', cron: cron.value } : { kind: 'off' });
 const schedule = computed(() => buildSchedule(preset.value));
@@ -86,7 +86,10 @@ const fieldErrors = computed(() => ({
 }));
 const problemCount = computed(() => Object.values(fieldErrors.value).filter(Boolean).length + Object.keys(stepErrors.value).length);
 const show = (k: keyof typeof fieldErrors.value) => (triedSave.value ? fieldErrors.value[k] : null);
-const shownStepErrors = computed(() => (triedSave.value ? stepErrors.value : {}));
+// a cron typo shows as you type; other schedule problems after the first save attempt
+const schedMsg = computed(() => (sched.value === 'custom' && cron.value.trim() ? cronError(cron.value) : null) ?? show('schedule'));
+const schedText = computed(() => (sched.value === 'custom' && cron.value.trim() && cronError(cron.value) ? 'Schedule needs fixing' : describeSchedule(schedule.value)));
+const shownStepErrors =computed(() => (triedSave.value ? stepErrors.value : {}));
 
 // ── save / run / delete ──────────────────────────────────────────────────────
 async function save(): Promise<Flow | null> {
@@ -170,7 +173,10 @@ const recElapsed = computed(() => { void recTick.value; const s = recording.valu
 const snap = ref('');
 const state = () => JSON.stringify([name.value, scope.value, brandIds.value, steps.value, enabled.value, schedule.value]);
 function snapshot() { snap.value = state(); }
-const dirty = computed(() => state() !== snap.value);
+// nothing to lose while the flow is loading or could not be opened
+const dirty = computed(() => !loading.value && !loadError.value && state() !== snap.value);
+// load last: fill() snapshots synchronously, so everything state() reads must exist already
+watch(() => route.params.id, id => { if (id && route.path.startsWith('/flows/')) void load(); }, { immediate: true });
 onBeforeRouteLeave(async () => {
   if (recording.value) { if (!(await confirm({ title: 'Stop recording and leave?', confirm: 'Stop and leave', danger: true }))) return false; await recStop(); }
   if (!dirty.value) return true;
@@ -191,9 +197,10 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
 <template>
   <div class="page flow-editor">
     <PageHeader eyebrow="Flow" :title="isNew ? 'New flow' : name || flow?.name || 'Flow'" :back="{ to: '/flows', label: 'Flows' }">
-      <span>{{ countSteps(steps) }} {{ countSteps(steps) === 1 ? 'step' : 'steps' }} · {{ describeSchedule(schedule) }}</span>
-      <span v-if="dirty" class="faint">Unsaved changes</span>
-      <template #actions>
+      <span v-if="!loadError && !loading">{{ countSteps(steps) }} {{ countSteps(steps) === 1 ? 'step' : 'steps' }} · {{ schedText }}</span>
+      <span v-if="flow?.schedule && flow.enabled && flow.nextRunAt && !dirty">next run {{ fmtWhen(flow.nextRunAt) }}</span>
+      <span v-if="dirty" class="unsaved"><span class="udot" />Unsaved changes</span>
+      <template v-if="!loadError" #actions>
         <Menu :items="menu" :width="190"><Btn icon="more" square aria-label="More" title="More" /></Menu>
         <Btn icon="play" :loading="running" :disabled="!steps.length" @click="runNow">Run now</Btn>
         <Btn variant="primary" icon="check" :loading="saving" @click="save">{{ isNew ? 'Create flow' : 'Save' }}</Btn>
@@ -206,7 +213,7 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
     <div v-else class="ed">
       <Transition name="slide-down">
         <div v-if="recording" class="recbar">
-          <div><span class="rdot" /><b>Recording in {{ brandName(recording.brandId) }}</b> — do it once in its window. <span class="num muted">{{ recElapsed }}</span></div>
+          <div><span class="rdot" /><b>Recording in {{ brandName(recording.brandId) }}</b> — do it once in its window. <span class="num rtime">{{ recElapsed }}</span></div>
           <Btn variant="signal" size="sm" icon="stop" :loading="recBusy" @click="recStop">Stop and add steps</Btn>
         </div>
       </Transition>
@@ -231,18 +238,19 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
 
         <div class="hr" />
         <div class="schedgrid">
-          <Field label="Schedule" :error="show('schedule')" class="schedf">
+          <Field label="Schedule" class="schedf">
             <Segmented v-model="sched" size="sm" :options="[{ value: 'off', label: 'Manual' }, { value: 'hourly', label: 'Hourly' }, { value: 'daily', label: 'Daily' }, { value: 'weekdays', label: 'Weekdays' }, { value: 'custom', label: 'Cron' }]" />
           </Field>
           <div class="schedctl">
             <label v-if="sched === 'hourly'" class="inl small">at minute <input v-model.number="minute" type="number" min="0" max="59" class="input mini num" aria-label="Minute" /></label>
             <label v-else-if="sched === 'daily' || sched === 'weekdays'" class="inl small">at <input v-model="at" type="time" class="input tm" aria-label="Time" /></label>
-            <label v-else-if="sched === 'custom'" class="inl small grow"><input v-model="cron" class="input code-in" placeholder="*/30 9-18 * * 1-5" aria-label="Cron expression" spellcheck="false" /></label>
-            <span v-if="sched !== 'off'" class="tiny muted">{{ describeSchedule(schedule) }}</span>
+            <label v-else-if="sched === 'custom'" class="inl small grow"><input v-model="cron" class="input code-in" :class="{ invalid: !!schedMsg }" :aria-invalid="!!schedMsg" placeholder="*/30 9-18 * * 1-5" aria-label="Cron expression" spellcheck="false" /></label>
+            <span v-if="sched !== 'off' && !schedMsg" class="tiny muted">{{ describeSchedule(schedule) }}</span>
             <span class="grow" />
-            <Toggle v-model="enabled" label="Enabled" :hint="sched === 'off' ? 'Can be run' : 'Runs on schedule'" />
+            <Toggle v-model="enabled" label="Enabled" :hint="sched === 'off' ? 'No schedule — run it any time' : enabled ? 'Runs on its schedule' : 'Paused — skips its schedule'" />
           </div>
         </div>
+        <p v-if="schedMsg" class="tiny err mt-2" role="alert">{{ schedMsg }}</p>
       </section>
 
       <section class="mt-6">
@@ -261,7 +269,7 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
             <p class="small muted mt-2">Press Record, do the task once in the brand’s Chrome window, then Stop. Clicks, typing and page changes become steps at the end of this list — check the selectors afterwards.</p>
           </div>
           <div class="recctl">
-            <div class="bp2"><BrandPicker v-model="recBrand" placeholder="Brand to record in…" /></div>
+            <div class="bp2"><BrandPicker v-model="recBrand" placeholder="Brand to record in…" :disabled="!!recording" /></div>
             <Btn v-if="!recording" icon="record" :loading="recBusy" :disabled="!recBrand" @click="recStart">Record</Btn>
             <Btn v-else variant="signal" icon="stop" :loading="recBusy" @click="recStop">Stop</Btn>
           </div>
@@ -274,6 +282,10 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
 </template>
 
 <style scoped>
+/* a very long flow name stays two lines in the header (the full name is in the Name field) */
+.flow-editor :deep(.page-header .title .mask > span) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.unsaved { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); }
+.udot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px 24px; align-items: start; }
 .bp { width: min(360px, 100%); }
 .brandgrid { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -288,8 +300,11 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
 .tm { width: 120px; min-height: 34px; padding: 5px 8px; }
 .code-in { font-family: var(--mono); font-size: var(--fs-xs); min-height: 34px; padding: 5px 10px; min-width: 200px; }
 .err { color: var(--bad); }
+.input.invalid { border-color: var(--bad); }
+.input.invalid:focus-visible { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-bg); }
 .recbar { position: sticky; top: calc(var(--topbar) + 8px); z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 16px; margin-bottom: var(--s4); border-radius: var(--r-lg); background: var(--ink); color: var(--bone); box-shadow: var(--shadow-2); font-size: var(--fs-sm); flex-wrap: wrap; }
 [data-theme='dark'] .recbar { box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-2); }
+.rtime { color: #a19e94; margin-left: 4px; }
 .rdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #ff5a4f; margin-right: 8px; animation: ff-pulse 1.4s var(--ease-out) infinite; vertical-align: 0; }
 .recctl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .bp2 { width: 240px; }

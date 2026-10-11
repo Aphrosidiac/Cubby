@@ -25,9 +25,9 @@ const toggle = (id: string) => { chosen.value = props.multi ? (chosen.value.incl
       <li v-for="b in list" :key="b.id">
         <button type="button" class="bi" :class="{ on: chosen.includes(b.id) }" role="option" :aria-selected="chosen.includes(b.id)" @click="toggle(b.id)" @dblclick="!multi && emit('confirm', [b.id])">
           <BrandAvatar :brand="b" :size="22" />
-          <span class="grow ellipsis">{{ b.name }}</span>
-          <span class="tiny muted">{{ b.status === 'open' ? 'open' : '' }}</span>
-          <span class="box"><Icon v-if="chosen.includes(b.id)" name="check" :size="12" :stroke="2.2" /></span>
+          <span class="grow ellipsis" :title="b.name">{{ b.name }}</span>
+          <span v-if="b.status === 'open'" class="tiny muted">open</span>
+          <span class="box" :class="{ radio: !multi }"><Icon v-if="chosen.includes(b.id) && multi" name="check" :size="12" :stroke="2.2" /></span>
         </button>
       </li>
       <li v-if="!list.length" class="small muted">No brands to choose.</li>
@@ -40,10 +40,13 @@ const toggle = (id: string) => { chosen.value = props.multi ? (chosen.value.incl
 </template>
 
 <style scoped>
-.bl { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
+/* the list is the only thing that scrolls, even in a 620 px window (no scroll inside a scrolling modal) */
+.bl { display: flex; flex-direction: column; gap: 4px; max-height: clamp(140px, calc(100vh - 380px), 320px); overflow-y: auto; }
 .bi { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; text-align: left; font-size: var(--fs-base); border: 1px solid transparent; }
 .bi:hover { background: var(--panel-2); }
 .bi.on { border-color: var(--fg); background: var(--bg-elev); }
-.box { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.box { flex: none; width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px var(--line-strong); }
 .on .box { background: var(--fg); color: var(--bg); box-shadow: none; }
+.box.radio { border-radius: 50%; }
+.on .box.radio { background: none; box-shadow: inset 0 0 0 5px var(--fg); }
 </style>

@@ -30,8 +30,11 @@ import type { Column, MenuItem } from '@/components/ui/types';
 const route = useRoute();
 const router = useRouter();
 useBrands();
-const tab = ref<string>(['flows', 'recipes', 'runs'].includes(String(route.query.tab)) ? String(route.query.tab) : 'flows');
-watch(tab, t => void router.replace({ query: { ...route.query, tab: t === 'flows' ? undefined : t } }));
+const tabOf = (q: unknown) => (['flows', 'recipes', 'runs'].includes(String(q)) ? String(q) : 'flows');
+const tab = ref<string>(tabOf(route.query.tab));
+watch(tab, t => { if (tabOf(route.query.tab) !== t) void router.replace({ query: { ...route.query, tab: t === 'flows' ? undefined : t } }); });
+// the sidebar "Flows" link or a "/flows?tab=runs" link while already here switches the tab too
+watch(() => route.query.tab, q => { if (route.path === '/flows') tab.value = tabOf(q); });
 
 const flows = useLoad(() => api('flows.list'), { topics: ['flows.changed'] });
 const recipes = useLoad(() => api('flows.recipes'));
@@ -95,27 +98,27 @@ const SCOPE: Record<Flow['brandScope'], string> = { one: 'One brand', many: 'Sev
 const scopeText = (f: Flow) => (f.brandScope === 'any' || !f.brandIds.length ? SCOPE[f.brandScope] : f.brandIds.length <= 2 ? f.brandIds.map(brandName).join(', ') : `${f.brandIds.length} brands`);
 
 const flowCols: Column[] = [
-  { key: 'name', label: 'Flow', sortable: true },
-  { key: 'brandScope', label: 'Brands', width: '200px' },
-  { key: 'schedule', label: 'Schedule', width: '210px', hideSm: true },
-  { key: 'last', label: 'Last run', width: '150px', hideSm: true },
-  { key: 'enabled', label: 'On', width: '64px' },
-  { key: 'menu', label: '', width: '48px', align: 'right' }
+  { key: 'name', label: 'Flow', sortable: true, class: 'c-fill' },
+  { key: 'brandScope', label: 'Brands', width: '180px', class: 'c-brands' },
+  { key: 'schedule', label: 'Schedule', width: '200px', hideSm: true, class: 'c-sched' },
+  { key: 'last', label: 'Last run', width: '140px', hideSm: true, class: 'c-wide' },
+  { key: 'enabled', label: 'On', width: '60px' },
+  { key: 'menu', label: '', width: '46px', align: 'right' }
 ];
 const runCols: Column[] = [
-  { key: 'label', label: 'Run', sortable: true },
+  { key: 'label', label: 'Run', sortable: true, class: 'c-fill' },
   { key: 'brandId', label: 'Brand', width: '160px' },
-  { key: 'actor', label: 'By', width: '110px', hideSm: true },
+  { key: 'actor', label: 'By', width: '110px', hideSm: true, class: 'c-wide' },
   { key: 'status', label: 'Status', width: '120px', sortable: true },
   { key: 'startedAt', label: 'Started', width: '130px', sortable: true },
-  { key: 'dur', label: 'Took', width: '80px', align: 'right', hideSm: true }
+  { key: 'dur', label: 'Took', width: '80px', align: 'right', hideSm: true, class: 'c-wide' }
 ];
 const kindsText = (r: RecipeInfo) => r.kinds.map(k => KIND_LABEL[k]).join(' · ') || 'General';
 const isPosting = (r: RecipeInfo) => !!r.platform && r.kinds.length > 0;
 const tabs = computed(() => [
   { value: 'flows', label: 'Flows', count: flows.data.value?.length ?? null },
   { value: 'recipes', label: 'Built-in recipes', count: recipes.data.value?.length ?? null },
-  { value: 'runs', label: 'Runs', count: (runs.data.value ?? []).filter(r => r.status === 'running').length || null }
+  { value: 'runs', label: 'Runs', count: runs.data.value?.length ?? null }
 ]);
 </script>
 
@@ -133,15 +136,15 @@ const tabs = computed(() => [
       <!-- flows -->
       <template v-if="tab === 'flows'">
         <EmptyState v-if="flows.error.value && !flows.data.value" icon="warn" title="Flows aren’t available yet" :body="flows.error.value"><Btn size="sm" icon="refresh" @click="flows.reload()">Try again</Btn></EmptyState>
-        <DataTable v-else :columns="flowCols" :rows="flows.data.value" :loading="flows.loading.value" @row-click="r => router.push(`/flows/${r.id}`)">
+        <DataTable v-else :class="{ 'is-empty': flows.data.value?.length === 0 }" :columns="flowCols" :rows="flows.data.value" :loading="flows.loading.value" @row-click="r => router.push(`/flows/${r.id}`)">
           <template #cell-name="{ row }">
-            <div class="strong">{{ row.name }}</div>
-            <div class="tiny muted">{{ countSteps(row.steps) }} {{ countSteps(row.steps) === 1 ? 'step' : 'steps' }}</div>
+            <div class="strong ellipsis" :title="row.name">{{ row.name }}</div>
+            <div class="tiny muted ellipsis"><span class="num">{{ countSteps(row.steps) }}</span> {{ countSteps(row.steps) === 1 ? 'step' : 'steps' }}<span v-if="lastRun.get(row.id)" class="narrow-only"> · last run {{ runStatus(lastRun.get(row.id)!.status).label.toLowerCase() }} {{ ago(lastRun.get(row.id)!.startedAt) }}</span></div>
           </template>
           <template #cell-brandScope="{ row }">
-            <div class="row gap-2">
-              <span class="avs"><BrandAvatar v-for="id in row.brandIds.slice(0, 4)" :key="id" :brand="brandOrStub(id)" :size="20" /></span>
-              <span class="small muted ellipsis">{{ scopeText(row as Flow) }}</span>
+            <div class="row gap-2" :title="row.brandIds.length ? row.brandIds.map(brandName).join(', ') : undefined">
+              <span v-if="row.brandIds.length" class="avs"><BrandAvatar v-for="id in row.brandIds.slice(0, 4)" :key="id" :brand="brandOrStub(id)" :size="20" /></span>
+              <span class="small muted ellipsis" :class="{ 'wide-only': row.brandIds.length }">{{ scopeText(row as Flow) }}</span>
             </div>
           </template>
           <template #cell-schedule="{ row }">
@@ -154,13 +157,13 @@ const tabs = computed(() => [
               <Chip size="sm" :tone="runStatus(lastRun.get(row.id)!.status).tone">{{ runStatus(lastRun.get(row.id)!.status).label }}</Chip>
               <div class="tiny muted mt-1">{{ ago(lastRun.get(row.id)!.startedAt) }}</div>
             </template>
-            <span v-else class="tiny faint">never</span>
+            <span v-else class="tiny muted">Never run</span>
           </template>
           <template #cell-enabled="{ row }">
             <span @click.stop><Toggle :model-value="row.enabled" :disabled="toggling === row.id" :aria-label="`${row.name} enabled`" @update:model-value="setEnabled(row as Flow, $event)" /></span>
           </template>
           <template #cell-menu="{ row }">
-            <span @click.stop><Menu :items="flowMenu(row as Flow)" :width="190"><button type="button" class="ib" :aria-label="`${row.name} actions`"><Icon name="more" :size="16" /></button></Menu></span>
+            <span @click.stop><Menu :items="flowMenu(row as Flow)" :width="190"><button type="button" class="ib" :aria-label="`${row.name} actions`"><Icon name="more" :size="16" :stroke="3" /></button></Menu></span>
           </template>
           <template #empty>
             <EmptyState icon="flow" title="No flows yet" body="Build one from steps, or press Record and do it once in a brand window.">
@@ -179,14 +182,18 @@ const tabs = computed(() => [
         <EmptyState v-else-if="!recipes.data.value?.length" icon="bolt" title="No recipes installed" />
         <div v-else class="rgrid">
           <article v-for="r in recipes.data.value" :key="r.id" class="recipe">
-            <div class="row gap-2">
+            <div class="row">
               <span class="ric"><PlatformIcon v-if="r.platform" :platform="r.platform" :size="16" colored /><Icon v-else name="bolt" :size="16" /></span>
-              <h3 class="h3 grow ellipsis">{{ r.name }}</h3>
+              <div class="grow rhead">
+                <h3 class="h3 ellipsis" :title="r.name">{{ r.name }}</h3>
+                <div class="tiny muted ellipsis" :title="kindsText(r)">{{ kindsText(r) }}</div>
+              </div>
             </div>
             <p class="small muted desc">{{ r.description }}</p>
-            <div class="row between">
-              <span class="tiny muted">{{ kindsText(r) }}</span>
-              <Btn v-if="isPosting(r)" size="sm" variant="ghost" icon="compose" to="/compose" title="Posting recipes run from a post in the composer">From composer</Btn>
+            <div class="row rfoot">
+              <span v-if="isPosting(r)" class="tiny muted">Runs from a post</span>
+              <span class="grow" />
+              <Btn v-if="isPosting(r)" size="sm" variant="ghost" icon="compose" to="/compose" title="Posting recipes need a post — write one in the composer and it runs this recipe">Open composer</Btn>
               <Btn v-else size="sm" icon="play" @click="runTarget = { kind: 'recipe', recipe: r }">Run on brand…</Btn>
             </div>
           </article>
@@ -196,9 +203,9 @@ const tabs = computed(() => [
       <!-- runs -->
       <template v-else>
         <EmptyState v-if="runs.error.value && !runs.data.value" icon="warn" title="Run history isn’t available yet" :body="runs.error.value"><Btn size="sm" icon="refresh" @click="runs.reload()">Try again</Btn></EmptyState>
-        <DataTable v-else :columns="runCols" :rows="runs.data.value" :loading="runs.loading.value" dense @row-click="r => router.push(`/runs/${r.id}`)">
-          <template #cell-label="{ row }"><span class="ellipsis strongish">{{ row.label }}</span><div v-if="row.error" class="tiny bad ellipsis">{{ row.error }}</div></template>
-          <template #cell-brandId="{ row }"><span class="row gap-2"><BrandAvatar :brand="brandOrStub(row.brandId)" :size="18" /><span class="small ellipsis">{{ brandName(row.brandId) }}</span></span></template>
+        <DataTable v-else :class="{ 'is-empty': runs.data.value?.length === 0 }" :columns="runCols" :rows="runs.data.value" :loading="runs.loading.value" dense @row-click="r => router.push(`/runs/${r.id}`)">
+          <template #cell-label="{ row }"><div class="ellipsis strongish" :title="row.label">{{ row.label }}</div><div v-if="row.error" class="tiny ellipsis" :class="row.status === 'needs_human' ? 'warnt' : row.status === 'aborted' ? 'muted' : 'bad'" :title="row.error">{{ row.error }}</div></template>
+          <template #cell-brandId="{ row }"><span class="row gap-2"><BrandAvatar :brand="brandOrStub(row.brandId)" :size="18" /><span class="small ellipsis" :title="brandName(row.brandId)">{{ brandName(row.brandId) }}</span></span></template>
           <template #cell-actor="{ row }"><ActorChip :actor="row.actor" /></template>
           <template #cell-status="{ row }"><Chip size="sm" :tone="runStatus(row.status).tone">{{ runStatus(row.status).label }}</Chip></template>
           <template #cell-startedAt="{ row }"><span class="small" :title="fmtWhen(row.startedAt)">{{ ago(row.startedAt) }}</span></template>
@@ -208,7 +215,7 @@ const tabs = computed(() => [
       </template>
     </div>
 
-    <RunBrandModal :open="!!runTarget" :title="runTarget?.kind === 'flow' ? `Run “${runTarget.flow.name}”` : `Run ${runTarget?.recipe.name ?? ''}`"
+    <RunBrandModal :open="!!runTarget" :title="runTarget?.kind === 'flow' ? `Run “${runTarget.flow.name}”` : `Run “${runTarget?.recipe.name ?? ''}”`"
       :multi="runTarget?.kind === 'flow' && runTarget.flow.brandScope !== 'one'" :limit-to="runTarget?.kind === 'flow' && runTarget.flow.brandScope !== 'any' ? runTarget.flow.brandIds : null"
       :busy="running" @update:open="v => !v && (runTarget = null)" @confirm="confirmRun" />
   </div>
@@ -216,6 +223,18 @@ const tabs = computed(() => [
 
 <style scoped>
 .tabbody { padding-top: var(--s5); }
+/* the title column takes what is left and truncates instead of widening the table */
+.flows :deep(td.c-fill) { max-width: 0; }
+.narrow-only { display: none; }
+/* small windows: the secondary columns fold away (last run moves under the flow name) */
+@media (max-width: 1180px) {
+  .flows :deep(.c-wide) { display: none; }
+  .narrow-only { display: inline; }
+  /* brands shrink to their avatars (names in the tooltip), the schedule column narrows */
+  .wide-only { display: none; }
+  .flows :deep(th.c-brands) { width: 104px !important; }
+  .flows :deep(th.c-sched) { width: 176px !important; }
+}
 .avs { display: inline-flex; }
 .avs > * + * { margin-left: -6px; box-shadow: 0 0 0 2px var(--bg); }
 .ib { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
@@ -227,5 +246,12 @@ const tabs = computed(() => [
 .desc { flex: 1; line-height: 1.45; }
 .strongish { font-weight: 500; }
 .bad { color: var(--bad); }
+.warnt { color: var(--warn); }
+.rhead { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rfoot { gap: 10px; }
+/* menus in the last rows must not be clipped by the table's scroll box (columns fold before it could overflow) */
+.flows :deep(.ff-table) { overflow: visible; }
+/* no column headings over an empty state */
+.flows :deep(.ff-table.is-empty thead) { display: none; }
 .mt-1 { margin-top: 2px; }
 </style>

@@ -13,7 +13,7 @@ import PlatformIcon from '@/components/common/PlatformIcon.vue';
 import MediaTile from '@/components/media/MediaTile.vue';
 import AssetDrawer from '@/components/media/AssetDrawer.vue';
 import WatchFoldersDrawer from '@/components/media/WatchFoldersDrawer.vue';
-import { MEDIA_EXT, aspectLabel, droppedPaths, isFileDrag, platformSummary } from '@/components/media/fit';
+import { MEDIA_EXT, aspectLabel, droppedPaths, fitTitle, isFileDrag, platformSummary } from '@/components/media/fit';
 import { clock } from '@/components/posts/time';
 import { api, fileUrl } from '@/lib/api';
 import { bytes, shortDate } from '@/lib/format';
@@ -31,7 +31,7 @@ const view = ref<'grid' | 'list'>((() => { try { return (localStorage.getItem('c
 watch(view, v => { try { localStorage.setItem('cubby-media-view', v); } catch { /* ignore */ } });
 
 const { data, loading, error, reload } = useLoad(
-  () => api('media.list', { q: qDebounced.value || undefined, tag: tag.value || undefined, kind: kind.value === 'all' ? undefined : kind.value }),
+  () => api('media.list', { includeMissing: true, q: qDebounced.value || undefined, tag: tag.value || undefined, kind: kind.value === 'all' ? undefined : kind.value }),
   { topics: ['media.changed'], deps: [qDebounced, tag, kind] }
 );
 
@@ -40,6 +40,7 @@ const seenTags = ref(new Set<string>());
 watch(data, d => { if (!d) return; const s = new Set(seenTags.value); d.forEach(a => a.tags.forEach(x => s.add(x))); seenTags.value = s; });
 const tagOptions = computed(() => [{ value: null, label: 'All tags' }, ...[...seenTags.value].sort().map(x => ({ value: x, label: `#${x}` }))]);
 const filtered = computed(() => !!(qDebounced.value || tag.value || kind.value !== 'all'));
+const missingCount = computed(() => (data.value ?? []).filter(a => a.missing).length);
 
 const current = ref<MediaAsset | null>(null);
 const foldersOpen = ref(false);
@@ -85,12 +86,12 @@ function onRemoved(id: string) {
 }
 
 const columns: Column[] = [
-  { key: 'filename', label: 'File', sortable: true },
-  { key: 'kind', label: 'Type', width: '84px', sortable: true },
+  { key: 'filename', label: 'File', sortable: true, class: 'c-fill' },
+  { key: 'kind', label: 'Type', width: '84px', sortable: true, class: 'c-wide' },
   { key: 'durationMs', label: 'Length', width: '80px', align: 'right', sortable: true },
-  { key: 'aspect', label: 'Aspect', width: '84px', hideSm: true },
-  { key: 'fits', label: 'Fits', width: '196px', hideSm: true },
-  { key: 'sizeBytes', label: 'Size', width: '90px', align: 'right', sortable: true, hideSm: true },
+  { key: 'aspect', label: 'Aspect', width: '84px', hideSm: true, class: 'c-wide' },
+  { key: 'fits', label: 'Fits', width: '180px', hideSm: true },
+  { key: 'sizeBytes', label: 'Size', width: '90px', align: 'right', sortable: true, hideSm: true, class: 'c-wide' },
   { key: 'addedAt', label: 'Added', width: '96px', align: 'right', sortable: true }
 ];
 </script>
@@ -98,20 +99,20 @@ const columns: Column[] = [
 <template>
   <div class="page media" @dragenter.prevent="enter" @dragover.prevent @dragleave="leave" @drop.prevent="drop">
     <PageHeader eyebrow="Library" title="Media">
-      <span v-if="data">{{ data.length }} {{ data.length === 1 ? 'file' : 'files' }}{{ filtered ? ' match' : '' }}</span>
-      <span class="faint">Files stay where they are — the library only indexes them.</span>
+      <span v-if="data" class="num">{{ data.length }} {{ data.length === 1 ? 'file' : 'files' }}{{ filtered ? (data.length === 1 ? ' matches' : ' match') : '' }}<template v-if="missingCount"> · <span class="missn">{{ missingCount }} missing</span></template></span>
+      <span>Files stay where they are — the library only indexes them.</span>
       <template #actions>
         <Btn icon="folder" @click="foldersOpen = true">Watch folders</Btn>
         <Btn variant="primary" icon="plus" :loading="adding > 0" @click="pick">Add files</Btn>
       </template>
     </PageHeader>
 
-    <div class="toolbar">
+    <div v-if="data?.length || filtered || loading" class="toolbar">
       <label class="search"><Icon name="search" :size="15" /><input v-model="q" placeholder="Search file names and tags" aria-label="Search media" @keydown.esc="q = ''" /></label>
       <Select v-model="tag" variant="pill" :options="tagOptions" aria-label="Filter by tag" :min-width="180" />
       <Segmented v-model="kind" size="sm" :options="[{ value: 'all', label: 'All' }, { value: 'video', label: 'Video', icon: 'video' }, { value: 'image', label: 'Image', icon: 'image' }]" />
       <span class="grow" />
-      <Segmented v-model="view" size="sm" :options="[{ value: 'grid', icon: 'grid' }, { value: 'list', icon: 'rows' }]" aria-label="View" />
+      <Segmented v-model="view" size="sm" :options="[{ value: 'grid', label: 'Grid', icon: 'grid' }, { value: 'list', label: 'List', icon: 'rows' }]" aria-label="View" />
     </div>
 
     <Transition name="fade">
@@ -140,10 +141,10 @@ const columns: Column[] = [
     <DataTable v-else :columns="columns" :rows="data" dense :selected="current?.id ?? null" @row-click="r => (current = r as MediaAsset)">
       <template #cell-filename="{ row }">
         <div class="fcell">
-          <img v-if="row.thumb" :src="fileUrl(row.thumb)" alt="" class="mini" loading="lazy" />
+          <img v-if="row.thumb" :src="fileUrl(row.thumb)" alt="" class="mini" :class="{ gone: row.missing }" loading="lazy" />
           <span v-else class="mini ph"><Icon :name="row.kind === 'video' ? 'video' : 'image'" :size="14" /></span>
           <div class="grow">
-            <div class="ellipsis strongish">{{ row.filename }}<span v-if="row.missing" class="miss">missing</span></div>
+            <div class="fnrow"><span class="ellipsis strongish" :title="row.path">{{ row.filename }}</span><span v-if="row.missing" class="miss" title="The file was moved or deleted">missing</span></div>
             <div v-if="row.tags.length" class="tiny muted ellipsis">{{ row.tags.map((x: string) => `#${x}`).join(' ') }}</div>
           </div>
         </div>
@@ -153,7 +154,7 @@ const columns: Column[] = [
       <template #cell-aspect="{ row }"><span class="num small">{{ aspectLabel(row) }}</span></template>
       <template #cell-fits="{ row }">
         <span class="fits">
-          <span v-for="f in platformSummary(row as MediaAsset)" :key="f.platform" class="fit" :class="`l-${f.level}`" :title="`${f.platform}: ${f.level}`"><PlatformIcon :platform="f.platform" :size="12" /></span>
+          <span v-for="f in platformSummary(row as MediaAsset)" :key="f.platform" class="fit" :class="`l-${f.level}`" :title="fitTitle(f)"><PlatformIcon :platform="f.platform" :size="12" /></span>
         </span>
       </template>
       <template #cell-sizeBytes="{ row }"><span class="num small">{{ bytes(row.sizeBytes) }}</span></template>
@@ -171,7 +172,9 @@ const columns: Column[] = [
 
 <style scoped>
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: var(--s5); }
-.search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); width: min(320px, 100%); transition: border-color 150ms; }
+.search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); flex: 0 1 320px; min-width: 200px; transition: border-color 150ms; }
+/* small windows: search gets its own row, filters and the view switch share the next one */
+@media (max-width: 1180px) { .search { flex: 1 1 100%; } }
 .search:focus-within { border-color: var(--focus-border); }
 .search input { flex: 1; border: 0; background: none; outline: none; color: var(--fg); min-width: 0; }
 .search input:focus-visible { box-shadow: none; outline: none; }
@@ -188,9 +191,16 @@ const columns: Column[] = [
 .mini { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex: none; background: var(--panel-2); }
 .mini.ph { display: grid; place-items: center; color: var(--faint); }
 .strongish { font-weight: 500; }
-.miss { margin-left: 8px; font-size: var(--fs-2xs); color: var(--bad); font-family: var(--mono); text-transform: uppercase; }
-.fits { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-.fit { width: 20px; height: 18px; border-radius: 4px; display: grid; place-items: center; }
+.missn { color: var(--bad); }
+.fnrow { display: flex; align-items: baseline; min-width: 0; }
+.fnrow .ellipsis { min-width: 0; }
+.miss { flex: none; margin-left: 8px; font-size: var(--fs-2xs); color: var(--bad); font-family: var(--mono); text-transform: uppercase; }
+.fits { display: inline-flex; gap: 3px; flex-wrap: nowrap; }
+.mini.gone { opacity: .4; filter: grayscale(1); }
+/* list view: the file column takes what is left and truncates; small windows fold Type, Aspect and Size */
+.media :deep(td.c-fill) { max-width: 0; }
+@media (max-width: 1180px) { .media :deep(.c-wide) { display: none; } }
+.fit { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; flex: none; }
 .l-ok { background: var(--good-bg); color: var(--good); }
 .l-warn { background: var(--warn-bg); color: var(--warn); }
 .l-bad { background: var(--bad-bg); color: var(--bad); opacity: .75; }

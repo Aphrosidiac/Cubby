@@ -1,6 +1,6 @@
 // Media helpers shared by the library, the composer's picker and the asset drawer.
 import type { FitLevel, MediaAsset, Platform } from '@shared/types';
-import { FIT_TARGETS, fmtRatio } from '@shared/platforms';
+import { FIT_TARGETS, fmtRatio, platformName } from '@shared/platforms';
 
 const RANK: Record<FitLevel, number> = { ok: 0, warn: 1, bad: 2 };
 
@@ -15,6 +15,10 @@ export function platformSummary(a: MediaAsset): { platform: Platform; level: Fit
   }
   return [...best.entries()].map(([platform, level]) => ({ platform, level }));
 }
+
+const LEVEL: Record<FitLevel, string> = { ok: 'fits', warn: 'fits with changes', bad: 'does not fit' };
+/** Tooltip for one platform square: "Instagram: fits with changes". */
+export const fitTitle = (f: { platform: Platform; level: FitLevel }) => `${platformName(f.platform)}: ${LEVEL[f.level]}`;
 
 export function aspectLabel(a: Pick<MediaAsset, 'width' | 'height'>): string {
   return a.width && a.height ? fmtRatio(a.width / a.height) : '—';

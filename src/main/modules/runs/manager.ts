@@ -508,8 +508,21 @@ function abortState(s: RunState, reason: string): void {
 
 export function abortRun(runId: string, reason = 'Stopped by you'): boolean {
   const s = states.get(runId)
-  if (!s) return false
+  if (!s) return closeOrphan(runId, reason)
   abortState(s, reason)
+  return true
+}
+
+/** A row still marked running with nothing behind it (its process is gone): Abort just closes it. */
+function closeOrphan(runId: string, reason: string): boolean {
+  const r = db.get<{ log: string }>("SELECT log FROM runs WHERE id = ? AND status = 'running'", runId)
+  if (!r) return false
+  const at = nowIso()
+  const log = pj<RunLogEntry[]>(r.log, [])
+  log.push({ at, level: 'warn', msg: `${reason} — it was no longer running` })
+  db.run("UPDATE runs SET status = 'aborted', ended_at = ?, error = ?, log = ? WHERE id = ?", at, reason, j(log), runId)
+  emit('runs.changed', { id: runId, status: 'aborted' })
+  requestStatus()
   return true
 }
 

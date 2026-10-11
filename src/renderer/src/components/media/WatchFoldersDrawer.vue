@@ -36,6 +36,7 @@ async function remove(f: WatchFolder) {
 async function rescan() {
   await run('rescan', async () => { const r = await api('media.rescan'); ok('Rescan done', `${r.added} new · ${r.missing} missing`); });
 }
+const baseName = (p: string) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p;
 const reveal = (p: string) => void run(`rv:${p}`, () => api('app.revealPath', { path: p }));
 </script>
 
@@ -43,7 +44,7 @@ const reveal = (p: string) => void run(`rv:${p}`, () => api('app.revealPath', { 
   <Drawer :open="open" title="Watch folders" eyebrow="Media" :width="520" @update:open="emit('update:open', $event)">
     <p class="small muted">Cubby indexes these folders in place — nothing is copied or moved. New files appear in the library on their own; files that disappear are marked missing.</p>
     <div class="addrow mt-4">
-      <input v-model="tagsFor" class="input" placeholder="Tags for files from it (optional, comma separated)" aria-label="Tags for the new folder" />
+      <input v-model="tagsFor" class="input" placeholder="Tags for its files (optional)" title="Comma separated, e.g. reels, october" aria-label="Tags for the new folder" />
       <Btn variant="primary" icon="folder" :loading="busy === 'add'" @click="add">Add folder…</Btn>
     </div>
     <div class="mt-5">
@@ -54,8 +55,9 @@ const reveal = (p: string) => void run(`rv:${p}`, () => api('app.revealPath', { 
         <li v-for="f in data" :key="f.id">
           <Icon name="folder" :size="16" class="fi" />
           <div class="grow">
-            <button type="button" class="p code ellipsis" :title="`Show ${f.path}`" @click="reveal(f.path)">{{ f.path }}</button>
-            <div v-if="f.tags.length" class="tiny muted">{{ f.tags.map(t => `#${t}`).join(' ') }}</div>
+            <button type="button" class="p ellipsis" :title="`Show ${f.path} in Explorer`" @click="reveal(f.path)">{{ baseName(f.path) }}</button>
+            <div class="tiny muted code ellipsis" :title="f.path">{{ f.path }}</div>
+            <div v-if="f.tags.length" class="tiny muted ellipsis">{{ f.tags.map(t => `#${t}`).join(' ') }}</div>
           </div>
           <Btn size="sm" variant="subtle" square icon="trash" :title="`Stop watching ${f.path}`" :loading="busy === `rm:${f.id}`" @click="remove(f)" />
         </li>
@@ -72,6 +74,8 @@ const reveal = (p: string) => void run(`rv:${p}`, () => api('app.revealPath', { 
 .folders li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); }
 .folders li:first-child { border-top: 0; }
 .fi { color: var(--muted); }
-.p { display: block; max-width: 100%; text-align: left; color: var(--fg); }
+.folders .grow { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.addrow .input { flex: 1; min-width: 0; }
+.p { display: block; max-width: 100%; text-align: left; color: var(--fg); font-weight: 500; font-size: var(--fs-sm); }
 .p:hover { text-decoration: underline; }
 </style>

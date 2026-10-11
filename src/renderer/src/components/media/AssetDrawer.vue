@@ -63,7 +63,11 @@ function tagKey(e: KeyboardEvent) {
   else if (e.key === 'Backspace' && !tagInput.value && tags.value.length) removeTag(tags.value[tags.value.length - 1]);
 }
 
-async function reveal() { try { if (props.asset) await api('app.revealPath', { path: props.asset.path }); } catch (e) { fail(e); } }
+// a missing file can't be selected in Explorer: open the folder it was in instead
+const folderOf = (p: string) => p.replace(/[\\/][^\\/]*$/, '');
+async function reveal() { try { const a = props.asset; if (a) await api('app.revealPath', { path: a.missing ? folderOf(a.path) : a.path }); } catch (e) { fail(e); } }
+const CODEC: Record<string, string> = { mjpeg: 'JPEG', png: 'PNG', webp: 'WebP', gif: 'GIF', hevc: 'HEVC', h264: 'H.264', vp9: 'VP9', av1: 'AV1', prores: 'ProRes' };
+const codecLabel = (c: string) => CODEC[c.toLowerCase()] ?? c;
 async function remove() {
   const a = props.asset; if (!a) return;
   if (!(await confirm({ title: `Remove ${a.filename} from the library?`, body: 'The file stays where it is on disk — only the library entry goes. Posts that use it keep their reference.', confirm: 'Remove', danger: true }))) return;
@@ -76,14 +80,14 @@ async function remove() {
   <Drawer :open="open" :title="asset?.filename" eyebrow="Media" :width="600" @update:open="v => !v && emit('close')">
     <template v-if="asset">
       <div class="preview">
-        <video v-if="asset.kind === 'video' && !previewErr" :key="asset.id" controls preload="metadata" :src="fileUrl(asset.path)" :poster="asset.thumb ? fileUrl(asset.thumb) : undefined" @error="previewErr = true" />
-        <img v-else-if="asset.kind === 'image' && !previewErr" :src="fileUrl(asset.path)" alt="" @error="previewErr = true" />
+        <video v-if="asset.kind === 'video' && !previewErr && !asset.missing" :key="asset.id" controls preload="metadata" :src="fileUrl(asset.path)" :poster="asset.thumb ? fileUrl(asset.thumb) : undefined" @error="previewErr = true" />
+        <img v-else-if="asset.kind === 'image' && !previewErr && !asset.missing" :src="fileUrl(asset.path)" alt="" @error="previewErr = true" />
         <div v-else class="noprev"><Icon name="warn" :size="18" /><span class="small">{{ asset.missing ? 'The file is missing from disk.' : 'Preview not available for this file.' }}</span></div>
       </div>
       <div v-if="asset.missing" class="warnline small"><Icon name="warn" :size="14" />The file was moved or deleted. Put it back or remove it from the library.</div>
 
       <dl class="facts mt-4">
-        <dt>Type</dt><dd>{{ asset.kind === 'video' ? 'Video' : 'Image' }}<span v-if="asset.codec" class="muted"> · {{ asset.codec }}</span></dd>
+        <dt>Type</dt><dd>{{ asset.kind === 'video' ? 'Video' : 'Image' }}<span v-if="asset.codec" class="muted"> · {{ codecLabel(asset.codec) }}</span></dd>
         <dt>Size</dt><dd class="num">{{ asset.width && asset.height ? `${asset.width}×${asset.height}` : '—' }} · {{ aspectLabel(asset) }}</dd>
         <template v-if="asset.kind === 'video'"><dt>Length</dt><dd class="num">{{ clock(asset.durationMs) || '—' }}<span v-if="asset.fps" class="muted"> · {{ Math.round(asset.fps) }} fps</span></dd></template>
         <dt>File size</dt><dd class="num">{{ bytes(asset.sizeBytes) }}</dd>
@@ -131,8 +135,8 @@ async function remove() {
     <template #footer>
       <Btn variant="danger" size="sm" icon="trash" @click="remove">Remove from library</Btn>
       <span class="grow" />
-      <Btn size="sm" icon="folder" @click="reveal">Show in folder</Btn>
-      <Btn size="sm" variant="primary" icon="compose" :to="{ path: '/compose', query: { media: asset?.id } }">Use in a post</Btn>
+      <Btn size="sm" icon="folder" :title="asset?.missing ? 'Open the folder the file was in' : undefined" @click="reveal">Show in folder</Btn>
+      <Btn size="sm" variant="primary" icon="compose" :disabled="asset?.missing" :title="asset?.missing ? 'The file is missing — put it back first' : undefined" :to="asset?.missing ? undefined : { path: '/compose', query: { media: asset?.id } }">Use in a post</Btn>
     </template>
   </Drawer>
 </template>

@@ -47,7 +47,7 @@ const addItems = computed<MenuItem[]>(() => {
   return out;
 });
 const cardMenu = (i: number): MenuItem[] => [
-  { label: 'Move up', icon: 'chevron-left', run: () => move(i, i - 1), disabled: i === 0, hint: 'Alt ↑' },
+  { label: 'Move up', icon: 'chevron-down', run: () => move(i, i - 1), disabled: i === 0, hint: 'Alt ↑' },
   { label: 'Move down', icon: 'chevron-down', run: () => move(i, i + 1), disabled: i === props.modelValue.length - 1, hint: 'Alt ↓' },
   { label: 'Duplicate', icon: 'copy', run: () => duplicate(i) },
   { label: props.modelValue[i].note !== undefined || notes.value.has(props.modelValue[i].id) ? 'Remove note' : 'Add note', icon: 'note', run: () => toggleNote(i) },
@@ -91,6 +91,8 @@ function drop(i: number, e: DragEvent) {
 }
 function end() { from.value = over.value = null; armed.value = null; }
 
+/** Open/Close brand have no fields: no body unless they carry a note. */
+const hasBody = (s: FlowStep) => !['open_brand', 'close_brand'].includes(s.type) || s.note !== undefined || notes.value.has(s.id);
 const nested = (s: FlowStep, key: 'then' | 'else' | 'steps', v: FlowStep[]) => ({ ...s, [key]: v }) as FlowStep;
 </script>
 
@@ -100,7 +102,7 @@ const nested = (s: FlowStep, key: 'then' | 'else' | 'steps', v: FlowStep[]) => (
       <li v-for="(s, i) in modelValue" :key="s.id" :data-step="s.id" class="card" :class="{ err: !!errors[s.id], dragging: from === i, target: over === i && from !== i && from !== null, below: over === i && from !== null && from < i }"
         :draggable="armed === s.id" @dragstart="dragStart(i, $event)" @dragend="end" @dragover="dragOver(i, $event)" @drop="drop(i, $event)" @keydown="cardKey(i, $event)">
         <header class="hd">
-          <span class="handle" title="Drag to reorder" aria-hidden="true" @mousedown="armed = s.id" @mouseup="armed = null"><Icon name="drag" :size="16" /></span>
+          <span class="handle" title="Drag to reorder" aria-hidden="true" @mousedown="armed = s.id" @mouseup="armed = null"><Icon name="drag" :size="16" :stroke="3" /></span>
           <span class="idx num">{{ i + 1 }}</span>
           <Icon :name="STEP_META[s.type].icon" :size="15" class="ti" />
           <button type="button" class="ttl" :aria-expanded="!collapsed.has(s.id)" @click="toggle(s.id)">
@@ -108,11 +110,12 @@ const nested = (s: FlowStep, key: 'then' | 'else' | 'steps', v: FlowStep[]) => (
             <span v-if="collapsed.has(s.id) || ['open_brand', 'close_brand'].includes(s.type)" class="sum tiny muted ellipsis">{{ stepSummary(s) }}</span>
           </button>
           <span v-if="errors[s.id]" class="edot" :title="errors[s.id]" />
-          <button type="button" class="ib" :aria-label="collapsed.has(s.id) ? 'Expand' : 'Collapse'" @click="toggle(s.id)"><Icon name="chevron-down" :size="14" :class="{ rot: collapsed.has(s.id) }" /></button>
-          <Menu :items="cardMenu(i)" :width="200"><button type="button" class="ib" :aria-label="`Step ${i + 1} actions`"><Icon name="more" :size="16" /></button></Menu>
+          <span v-if="!hasBody(s)" class="ib-sp" />
+          <button v-else type="button" class="ib" :aria-label="collapsed.has(s.id) ? 'Expand step' : 'Collapse step'" :title="collapsed.has(s.id) ? 'Expand' : 'Collapse'" @click="toggle(s.id)"><Icon name="chevron-down" :size="14" :class="{ rot: collapsed.has(s.id) }" /></button>
+          <Menu :items="cardMenu(i)" :width="200"><button type="button" class="ib" :aria-label="`Step ${i + 1} actions`"><Icon name="more" :size="16" :stroke="3" /></button></Menu>
         </header>
         <p v-if="errors[s.id]" class="emsg tiny">{{ errors[s.id] }}</p>
-        <div v-show="!collapsed.has(s.id)" class="bd">
+        <div v-if="hasBody(s)" v-show="!collapsed.has(s.id)" class="bd">
           <StepFields v-if="!['open_brand', 'close_brand'].includes(s.type)" :step="s" :recipes="recipes" @update:step="update(i, $event)" />
           <input v-if="s.note !== undefined || notes.has(s.id)" class="input note" :value="s.note ?? ''" placeholder="Note — why this step is here" aria-label="Step note" @input="update(i, { ...s, note: ($event.target as HTMLInputElement).value })" />
           <template v-if="s.type === 'if_exists'">
@@ -145,7 +148,7 @@ const nested = (s: FlowStep, key: 'then' | 'else' | 'steps', v: FlowStep[]) => (
 .card.target::before { content: ''; position: absolute; left: 8px; right: 8px; top: -6px; height: 2px; background: var(--lime); box-shadow: 0 0 0 1px var(--ink); border-radius: 2px; }
 .card.target.below::before { top: auto; bottom: -6px; }
 .hd { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 8px; min-height: 44px; }
-.handle { color: var(--faint); cursor: grab; display: grid; place-items: center; width: 18px; height: 28px; }
+.handle { color: var(--muted); cursor: grab; display: grid; place-items: center; width: 18px; height: 28px; }
 .handle:hover { color: var(--fg); }
 .idx { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-size: var(--fs-2xs); background: var(--panel-2); color: var(--fg-2); flex: none; }
 .ti { color: var(--fg-2); }
@@ -155,6 +158,9 @@ const nested = (s: FlowStep, key: 'then' | 'else' | 'steps', v: FlowStep[]) => (
 .ib { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); flex: none; }
 .ib:hover { background: var(--panel-2); color: var(--fg); }
 .rot { transform: rotate(-90deg); }
+.ib-sp { width: 30px; flex: none; }
+/* the kit has no chevron-up: "Move up" (always the first item of the card menu) turns its chevron over */
+.hd :deep(.mi:first-of-type svg) { transform: rotate(180deg); }
 .emsg { color: var(--bad); padding: 0 12px 6px 62px; margin-top: -4px; }
 .bd { padding: 4px 14px 14px 62px; display: flex; flex-direction: column; gap: 12px; }
 .d1 .bd, .d2 .bd, .d3 .bd { padding-left: 14px; }
