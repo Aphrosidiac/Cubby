@@ -116,8 +116,9 @@ const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.
 .top { position: sticky; top: 0; z-index: 200; height: var(--topbar); display: flex; align-items: center; gap: 10px; padding: 0 0 0 28px; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line-soft); -webkit-app-region: drag; }
 .top > * { -webkit-app-region: no-drag; }
 .top .grow { -webkit-app-region: drag; }
-.wc-space { width: 140px; flex: none; -webkit-app-region: drag; }
-.mac .wc-space { width: 16px; }
+/* room for the window's caption buttons: --wc-w comes from the kit (titlebar-area env, 0 on macOS) */
+.wc-space { width: var(--wc-w, 140px); min-width: 12px; flex: none; -webkit-app-region: drag; }
+.mac .wc-space { width: var(--wc-w, 16px); min-width: 16px; }
 /* At the minimum window width the search pill gives way first (never below 140px), so the
    right-hand controls never slide under the Windows caption buttons. */
 .search { display: flex; align-items: center; gap: 10px; flex: 0 1 420px; min-width: 140px; height: 36px; padding: 0 8px 0 14px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: var(--fs-base); text-align: left; transition: border-color 200ms, box-shadow 300ms var(--ease-out); }
@@ -139,7 +140,7 @@ const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.
 .stopped { background: var(--bad-bg); color: var(--bad); }
 .stop, .stopped { flex: none; }
 .stop { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--bad) 35%, transparent); color: var(--bad); font-size: var(--fs-sm); font-weight: 500; transition: background-color 200ms, color 200ms; }
-.stop:hover { background: var(--bad); color: #fff; }
+.stop:hover, .stop:focus-visible { background: var(--bad); color: var(--bg); }
 .theme { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--fg-2); transition: background-color 200ms, color 200ms; }
 .theme:hover { background: var(--panel-2); color: var(--fg); }
 .content { padding: 32px 40px 96px; max-width: 1560px; margin: 0 auto; }

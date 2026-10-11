@@ -72,7 +72,7 @@ onMounted(() => {
 .collapse { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--side-muted); transition: background-color 200ms, color 200ms; }
 .collapse:hover { background: var(--side-hover); color: var(--side-fg); }
 .expand { margin: 0 auto 4px; }
-.nav { position: relative; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 10px 28px; scrollbar-color: #2a2a27 transparent; }
+.nav { position: relative; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 10px 28px; }
 .group { margin: 16px 12px 6px; font-family: var(--mono); font-size: var(--fs-2xs); letter-spacing: .12em; text-transform: uppercase; color: var(--side-muted); height: 12px; display: flex; align-items: center; }
 .gline { display: block; width: 100%; height: 1px; background: var(--side-line); }
 .collapsed .group { margin: 12px 8px 6px; }
