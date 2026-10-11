@@ -12,6 +12,8 @@ const emit = defineEmits<{ 'update:index': [v: number | null] }>();
 const cur = computed(() => (props.index == null ? null : props.images[props.index] ?? null));
 const go = (d: number) => { if (props.index == null || !props.images.length) return; emit('update:index', (props.index + d + props.images.length) % props.images.length); };
 function key(e: KeyboardEvent) { if (e.key === 'ArrowRight') go(1); if (e.key === 'ArrowLeft') go(-1); }
+// one separator style for the platform (paths can mix \ from Windows APIs and / from joins)
+const shownPath = computed(() => (cur.value ? (window.cubby?.platform === 'win32' ? cur.value.path.replace(/\//g, '\\') : cur.value.path) : ''));
 async function reveal() { try { if (cur.value) await api('app.revealPath', { path: cur.value.path }); } catch (e) { fail(e); } }
 </script>
 
@@ -23,7 +25,7 @@ async function reveal() { try { if (cur.value) await api('app.revealPath', { pat
       <button v-if="images.length > 1" type="button" class="nav r" aria-label="Next" @click="go(1)"><Icon name="chevron" :size="18" /></button>
     </div>
     <template #footer>
-      <span class="grow tiny muted ellipsis code">{{ cur?.path }}</span>
+      <span class="grow tiny muted ellipsis code" :title="shownPath">{{ shownPath }}</span>
       <Btn size="sm" icon="folder" @click="reveal">Show in folder</Btn>
     </template>
   </Modal>

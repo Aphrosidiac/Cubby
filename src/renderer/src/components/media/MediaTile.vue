@@ -15,7 +15,7 @@ const fits = computed(() => platformSummary(props.asset));
 </script>
 
 <template>
-  <div class="tile" :class="{ selected, missing: asset.missing, compact }" role="button" tabindex="0" :aria-pressed="selectable ? !!selected : undefined"
+  <div class="tile" :class="{ selected, missing: asset.missing, compact }" role="button" tabindex="0" :title="compact ? asset.filename : undefined" :aria-label="asset.filename" :aria-pressed="selectable ? !!selected : undefined"
     @click="selectable ? $emit('toggle') : $emit('open')" @keydown.enter.prevent="selectable ? $emit('toggle') : $emit('open')" @keydown.space.prevent="$emit('toggle')">
     <div class="thumb">
       <img v-if="asset.thumb && !broken" :src="fileUrl(asset.thumb)" alt="" loading="lazy" draggable="false" @error="broken = true" />

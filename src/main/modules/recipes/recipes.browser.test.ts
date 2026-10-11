@@ -105,7 +105,7 @@ describe.skipIf(!existsSync(CHROME))('recipes on fixtures (headless Chrome, all 
         } catch (e) {
           expect(e).toBeInstanceOf(GuardrailError)
           expect((e as GuardrailError).rule).toBe('handle_check')
-          expect((e as Error).message).toBe('X: could not confirm which account is logged in')
+          expect((e as Error).message).toMatch(/^X: no logged-in account is showing/)
         }
       })
       expect(out.run.status).toBe('ok')

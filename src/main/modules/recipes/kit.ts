@@ -254,7 +254,7 @@ export function identityMatches(found: string, account: Pick<Account, 'handle' |
  */
 export function assertHandle(rt: RunContext, account: Pick<Account, 'handle' | 'displayName'>, found: string[], platform: string, allowNames = false): string {
   const list = [...new Set(found.map((f) => (f || '').trim()).filter(Boolean))]
-  if (!list.length) throw new GuardrailError(`${platform}: could not confirm which account is logged in`, 'handle_check')
+  if (!list.length) throw new GuardrailError(`${platform}: no logged-in account is showing — the brand is probably logged out. Log in from Brand → Accounts, then try again.`, 'handle_check')
   const ok = list.find((f) => identityMatches(f, account, allowNames))
   if (ok) {
     rt.log(`Logged in as ${ok} ✓`)

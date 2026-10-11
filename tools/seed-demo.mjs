@@ -133,6 +133,8 @@ P.draft2 = await mkPost('indahnya', [acc('indahnya', 'instagram')], 'image', [],
 await sleep(500)
 const db = new DatabaseSync(join(DATA, 'app.sqlite'))
 db.exec('PRAGMA busy_timeout = 5000')
+// the daily background login check would open every brand and overwrite the seeded login states
+db.prepare("INSERT INTO settings (key, value) VALUES ('health.lastDaily', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' })))
 const screens = join(DATA, 'screens')
 const shotPng = (name, src) => { const p = join(screens, name); ff(['-f', 'lavfi', '-i', src, '-frames:v', '1', p]); return p }
 const scr = {
