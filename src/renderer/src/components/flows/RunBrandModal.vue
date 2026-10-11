@@ -40,7 +40,8 @@ const toggle = (id: string) => { chosen.value = props.multi ? (chosen.value.incl
 </template>
 
 <style scoped>
-.bl { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
+/* the list is the only thing that scrolls, even in a 620 px window (no scroll inside a scrolling modal) */
+.bl { display: flex; flex-direction: column; gap: 4px; max-height: clamp(140px, calc(100vh - 380px), 320px); overflow-y: auto; }
 .bi { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; text-align: left; font-size: var(--fs-base); border: 1px solid transparent; }
 .bi:hover { background: var(--panel-2); }
 .bi.on { border-color: var(--fg); background: var(--bg-elev); }

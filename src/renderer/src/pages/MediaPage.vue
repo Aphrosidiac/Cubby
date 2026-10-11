@@ -86,12 +86,12 @@ function onRemoved(id: string) {
 }
 
 const columns: Column[] = [
-  { key: 'filename', label: 'File', sortable: true },
-  { key: 'kind', label: 'Type', width: '84px', sortable: true },
+  { key: 'filename', label: 'File', sortable: true, class: 'c-fill' },
+  { key: 'kind', label: 'Type', width: '84px', sortable: true, class: 'c-wide' },
   { key: 'durationMs', label: 'Length', width: '80px', align: 'right', sortable: true },
-  { key: 'aspect', label: 'Aspect', width: '84px', hideSm: true },
-  { key: 'fits', label: 'Fits', width: '196px', hideSm: true },
-  { key: 'sizeBytes', label: 'Size', width: '90px', align: 'right', sortable: true, hideSm: true },
+  { key: 'aspect', label: 'Aspect', width: '84px', hideSm: true, class: 'c-wide' },
+  { key: 'fits', label: 'Fits', width: '180px', hideSm: true },
+  { key: 'sizeBytes', label: 'Size', width: '90px', align: 'right', sortable: true, hideSm: true, class: 'c-wide' },
   { key: 'addedAt', label: 'Added', width: '96px', align: 'right', sortable: true }
 ];
 </script>
@@ -141,7 +141,7 @@ const columns: Column[] = [
     <DataTable v-else :columns="columns" :rows="data" dense :selected="current?.id ?? null" @row-click="r => (current = r as MediaAsset)">
       <template #cell-filename="{ row }">
         <div class="fcell">
-          <img v-if="row.thumb" :src="fileUrl(row.thumb)" alt="" class="mini" loading="lazy" />
+          <img v-if="row.thumb" :src="fileUrl(row.thumb)" alt="" class="mini" :class="{ gone: row.missing }" loading="lazy" />
           <span v-else class="mini ph"><Icon :name="row.kind === 'video' ? 'video' : 'image'" :size="14" /></span>
           <div class="grow">
             <div class="fnrow"><span class="ellipsis strongish" :title="row.path">{{ row.filename }}</span><span v-if="row.missing" class="miss" title="The file was moved or deleted">missing</span></div>
@@ -195,8 +195,12 @@ const columns: Column[] = [
 .fnrow { display: flex; align-items: baseline; min-width: 0; }
 .fnrow .ellipsis { min-width: 0; }
 .miss { flex: none; margin-left: 8px; font-size: var(--fs-2xs); color: var(--bad); font-family: var(--mono); text-transform: uppercase; }
-.fits { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-.fit { width: 20px; height: 18px; border-radius: 4px; display: grid; place-items: center; }
+.fits { display: inline-flex; gap: 3px; flex-wrap: nowrap; }
+.mini.gone { opacity: .4; filter: grayscale(1); }
+/* list view: the file column takes what is left and truncates; small windows fold Type, Aspect and Size */
+.media :deep(td.c-fill) { max-width: 0; }
+@media (max-width: 1180px) { .media :deep(.c-wide) { display: none; } }
+.fit { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; flex: none; }
 .l-ok { background: var(--good-bg); color: var(--good); }
 .l-warn { background: var(--warn-bg); color: var(--warn); }
 .l-bad { background: var(--bad-bg); color: var(--bad); opacity: .75; }
