@@ -12,8 +12,10 @@ import { registerFileProtocol } from './protocol'
 import { createTray } from './tray'
 import { closeSwitcher, registerHotkey, setTitleBarColors, showMainWindow, watchHotkeySetting } from './windows'
 
-// Dev builds keep their data apart from the installed app.
-if (!app.isPackaged) app.setPath('userData', join(app.getPath('appData'), 'Cubby Dev'))
+// Dev builds keep their data apart from the installed app; CUBBY_DATA_DIR gives a fully separate
+// instance (own data, own single-instance lock) for tests and e2e.
+if (process.env.CUBBY_DATA_DIR) app.setPath('userData', process.env.CUBBY_DATA_DIR)
+else if (!app.isPackaged) app.setPath('userData', join(app.getPath('appData'), 'Cubby Dev'))
 app.setAppUserModelId('studio.ffdev.cubby')
 
 if (!app.requestSingleInstanceLock()) {

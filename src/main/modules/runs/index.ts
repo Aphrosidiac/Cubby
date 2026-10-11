@@ -53,6 +53,12 @@ export function liveRuns(): LiveRun[] {
   return []
 }
 
+/** The live run currently holding this brand, if any (Claude's browser tools refuse while one runs). */
+export function brandBusy(brandId: string): LiveRun | null {
+  void brandId
+  return null
+}
+
 export function abortRun(runId: string): boolean {
   void runId
   return false

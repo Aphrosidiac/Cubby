@@ -5,5 +5,10 @@ import { implement } from '../../core/registry'
 
 implement({})
 
+/** Start every enabled flow whose next_run_at <= now (called by the scheduler tick). */
+export async function runDueFlows(now: Date = new Date()): Promise<void> {
+  void now
+}
+
 export function start(): void {}
 export async function stop(): Promise<void> {}
