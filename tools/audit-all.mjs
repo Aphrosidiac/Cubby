@@ -36,11 +36,30 @@ const page = browser.contexts()[0].pages().find((p) => p.url().includes('#/') &&
 const errors = []
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 page.on('pageerror', (e) => errors.push(String(e)))
+// Resize the REAL window (not viewport emulation): the Windows caption-button area (env(titlebar-area-*))
+// is only correct for the window's true size. Content size = window size minus the frame Electron adds.
+const cdp = await browser.newBrowserCDPSession()
+const { targetInfos } = await cdp.send('Target.getTargets')
+const target = targetInfos.find((t) => t.type === 'page' && t.url.includes('#/') && !t.url.includes('switcher'))
+const { windowId } = await cdp.send('Browser.getWindowForTarget', { targetId: target.targetId })
+async function resizeWindow(w, h) {
+  await cdp.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } })
+  let bw = w
+  let bh = h
+  for (let i = 0; i < 3; i++) {
+    await cdp.send('Browser.setWindowBounds', { windowId, bounds: { left: 0, top: 0, width: bw, height: bh } })
+    await page.waitForTimeout(250)
+    const vp = await page.evaluate(() => [window.innerWidth, window.innerHeight])
+    if (vp[0] === w && vp[1] === h) break
+    bw += w - vp[0]
+    bh += h - vp[1]
+  }
+}
 const report = []
 for (const theme of themes) {
   await page.evaluate((t) => window.cubby.invoke('settings.set', { patch: { theme: t } }), theme)
   for (const [w, h] of sizes) {
-    await page.setViewportSize({ width: w, height: h })
+    await resizeWindow(w, h)
     const dir = join(out, theme, `${w}x${h}`)
     mkdirSync(dir, { recursive: true })
     for (const r of routes) {
