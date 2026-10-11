@@ -300,7 +300,7 @@ export const contract = {
     z.object({ brandId: id.optional(), actor: z.string().optional(), action: z.string().optional(), q: z.string().optional(), limit: z.number().max(1000).optional(), before: z.number().optional() }).optional().default({}),
     { readOnly: true, scope: 'read' }
   ),
-  'activity.exportCsv': cmd<{ path: string; count: number }>()(z.object({ brandId: id.optional(), actor: z.string().optional(), path: z.string().optional() }).optional().default({}), { actors: ['you'] }),
+  'activity.exportCsv': cmd<{ path: string; count: number }>()(z.object({ brandId: id.optional(), actor: z.string().optional(), action: z.string().optional(), q: z.string().optional(), path: z.string().optional() }).optional().default({}), { actors: ['you'] }),
 
   // ── Tokens & Claude ─────────────────────────────────────────────────────────
   'tokens.list': cmd<ApiToken[]>()(none, { actors: ['you'], readOnly: true }),

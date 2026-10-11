@@ -169,12 +169,7 @@ implement({
   },
 
   'activity.list': ({ brandId, actor, action, q, limit, before }) => {
-    const where: string[] = []
-    const vals: (string | number)[] = []
-    if (brandId) { where.push('a.brand_id = ?'); vals.push(brandId) }
-    if (actor) { where.push('a.actor = ?'); vals.push(actor) }
-    if (action) { where.push('a.action LIKE ?'); vals.push(action.replace(/\*/g, '%') + (action.includes('*') ? '' : '%')) }
-    if (q) { where.push('(a.action LIKE ? OR a.detail LIKE ? OR b.name LIKE ?)'); vals.push(`%${q}%`, `%${q}%`, `%${q}%`) }
+    const { where, vals } = activityWhere({ brandId, actor, action, q })
     if (before) { where.push('a.id < ?'); vals.push(before) }
     return db
       .all<ActivityRow>(
@@ -184,17 +179,26 @@ implement({
       )
       .map(mapActivity)
   },
-  'activity.exportCsv': ({ brandId, actor, path }) => {
-    const where: string[] = []
-    const vals: string[] = []
-    if (brandId) { where.push('a.brand_id = ?'); vals.push(brandId) }
-    if (actor) { where.push('a.actor = ?'); vals.push(actor) }
+  // exports exactly what the Activity screen shows: the same four filters
+  'activity.exportCsv': ({ brandId, actor, action, q, path }) => {
+    const { where, vals } = activityWhere({ brandId, actor, action, q })
     const rows = db.all<ActivityRow>(`SELECT a.*, b.name brand_name FROM activity a LEFT JOIN brands b ON b.id = a.brand_id ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY a.id`, ...vals)
     const file = path ?? join(paths.exports, `activity-${new Date().toISOString().slice(0, 10)}.csv`)
     writeFileSync(file, toCsv([['time', 'actor', 'brand', 'action', 'detail', 'screenshot'], ...rows.map((r) => [r.at, r.actor, r.brand_name ?? '', r.action, r.detail, r.screen ?? ''])]))
     return { path: file, count: rows.length }
   }
 })
+
+/** WHERE clause shared by activity.list and activity.exportCsv. `action` is a prefix (or a * pattern). */
+function activityWhere(f: { brandId?: string; actor?: string; action?: string; q?: string }): { where: string[]; vals: (string | number)[] } {
+  const where: string[] = []
+  const vals: (string | number)[] = []
+  if (f.brandId) { where.push('a.brand_id = ?'); vals.push(f.brandId) }
+  if (f.actor) { where.push('a.actor = ?'); vals.push(f.actor) }
+  if (f.action) { where.push('a.action LIKE ?'); vals.push(f.action.replace(/\*/g, '%') + (f.action.includes('*') ? '' : '%')) }
+  if (f.q) { where.push('(a.action LIKE ? OR a.detail LIKE ? OR b.name LIKE ?)'); vals.push(`%${f.q}%`, `%${f.q}%`, `%${f.q}%`) }
+  return { where, vals }
+}
 
 export function start(): void {
   setStatusEmitter(() => emit('app.status', buildStatus()))

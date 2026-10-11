@@ -58,18 +58,21 @@ const attrs = computed(() => props.to ? { to: props.to } : props.href ? { href: 
 .v-primary .sweep { background: color-mix(in srgb, var(--bg) 16%, var(--fg)); }
 .v-signal { background: var(--lime); color: var(--ink); }
 .v-signal .sweep { background: var(--ink); }
-.v-signal:hover:not(.disabled) { color: var(--lime); }
 .v-ghost { background: transparent; color: var(--fg); border-color: var(--line-strong); }
 .v-ghost .sweep { background: var(--panel-2); }
-.v-ghost:hover:not(.disabled) { border-color: var(--fg); }
+.v-ghost:hover:not(.disabled):not(:disabled) { border-color: var(--fg); }
 .v-subtle { background: transparent; color: var(--fg-2); }
 .v-subtle .sweep { background: var(--panel-2); }
-.v-subtle:hover { color: var(--fg); }
+.v-subtle:hover:not(.disabled):not(:disabled) { color: var(--fg); }
 .v-danger { background: transparent; color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
 .v-danger .sweep { background: var(--bad); }
-.v-danger:hover:not(.disabled) { color: #fff; border-color: var(--bad); }
+/* text over the red sweep: the page colour reads in both themes (white on the dark theme's
+   salmon red was 2:1); a disabled/loading button gets no sweep, so it keeps its red text */
+.v-danger:hover:not(.disabled):not(:disabled) { color: var(--bg); border-color: var(--bad); }
+.v-signal:hover:not(.disabled):not(:disabled) { color: var(--lime); }
 .disabled, .btn:disabled { opacity: .45; cursor: not-allowed; }
-.loading { cursor: progress; }
+/* busy is not disabled: the spinner stays at full strength */
+.btn.loading:not(.disabled) { opacity: 1; cursor: progress; }
 .spin { width: 15px; height: 15px; border-radius: 50%; border: 1.6px solid currentColor; border-right-color: transparent; animation: ff-spin .7s linear infinite; }
 .ir { transition: transform 300ms var(--ease-out); }
 .btn:hover .ir { transform: translateX(3px); }

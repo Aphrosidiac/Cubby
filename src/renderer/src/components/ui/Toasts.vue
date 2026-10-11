@@ -1,20 +1,22 @@
 <script setup lang="ts">
-import { dismiss, toasts } from '@/composables/toast';
+import { dismiss, pauseToasts, toasts, toastsPaused } from '@/composables/toast';
 import Icon from './Icon.vue';
 const ICON: Record<string, string> = { good: 'check', bad: 'warn', warn: 'warn', signal: 'bolt', neutral: 'info' };
+const blur = (e: FocusEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) pauseToasts(false); };
 </script>
 
 <template>
-  <div class="toasts" aria-live="polite">
+  <!-- hovering or tabbing into the stack holds every countdown (the bar stops with it) -->
+  <div class="toasts" :class="{ paused: toastsPaused }" aria-live="polite" @mouseenter="pauseToasts(true)" @mouseleave="pauseToasts(false)" @focusin="pauseToasts(true)" @focusout="blur">
     <TransitionGroup name="toast">
       <div v-for="t in toasts" :key="t.id" class="toast" :class="`t-${t.tone}`" role="status">
         <span class="ic"><Icon :name="ICON[t.tone]" :size="15" /></span>
         <div class="grow">
           <div class="tt">{{ t.title }}</div>
-          <div v-if="t.body" class="tb">{{ t.body }}</div>
+          <div v-if="t.body" class="tb" :title="t.body.length > 140 ? t.body : undefined">{{ t.body }}</div>
         </div>
-        <button v-if="t.action" class="act" @click="t.action.run(); dismiss(t.id)">{{ t.action.label }}</button>
-        <button class="x" aria-label="Dismiss" @click="dismiss(t.id)"><Icon name="close" :size="13" /></button>
+        <button v-if="t.action" type="button" class="act" @click="t.action.run(); dismiss(t.id)">{{ t.action.label }}</button>
+        <button type="button" class="x" aria-label="Dismiss" title="Dismiss" @click="dismiss(t.id)"><Icon name="close" :size="13" /></button>
         <span class="bar" :style="{ animationDuration: `${t.ms}ms` }" />
       </div>
     </TransitionGroup>
@@ -29,10 +31,14 @@ const ICON: Record<string, string> = { good: 'check', bad: 'warn', warn: 'warn',
 .t-good .ic, .t-signal .ic { background: var(--lime); color: var(--ink); }
 .t-bad .ic { background: #ff8a80; color: var(--ink); }
 .t-warn .ic { background: #f0bb4a; color: var(--ink); }
-.tt { font-weight: 600; font-size: var(--fs-base); line-height: 1.35; padding-top: 3px; }
-.tb { font-size: var(--fs-sm); color: rgba(243, 239, 228, .7); margin-top: 3px; line-height: 1.45; }
-.act { font-size: var(--fs-sm); font-weight: 600; color: var(--lime); padding: 4px 2px; }
-.x { color: rgba(243, 239, 228, .5); padding: 4px; transition: color 200ms; } .x:hover { color: var(--bone); }
+/* long words (file paths, URLs, ids) break inside the card instead of running out of it */
+.tt { font-weight: 600; font-size: var(--fs-base); line-height: 1.35; padding-top: 3px; overflow-wrap: anywhere; }
+.tb { font-size: var(--fs-sm); color: rgba(243, 239, 228, .7); margin-top: 3px; line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
+.act { flex: none; white-space: nowrap; font-size: var(--fs-sm); font-weight: 600; color: var(--lime); padding: 4px 6px; margin: 0 -4px; border-radius: var(--r); text-decoration: underline transparent; text-underline-offset: 3px; transition: text-decoration-color 200ms; }
+.act:hover { text-decoration-color: currentColor; }
+.x { flex: none; color: rgba(243, 239, 228, .6); padding: 4px; border-radius: 50%; transition: color 200ms; } .x:hover { color: var(--bone); }
+.toast :focus-visible { box-shadow: none; outline-offset: 1px; }
+.paused .bar { animation-play-state: paused; }
 /* Phones: toasts drop in from the top — the bottom edge belongs to the thumb, the
    portal's tab bar and the pay / accept bars. */
 @media (max-width: 560px) {

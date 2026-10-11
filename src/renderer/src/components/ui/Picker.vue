@@ -104,7 +104,7 @@ onBeforeUnmount(() => { document.removeEventListener('mousedown', outside); wind
 .open .trigger { border-color: var(--focus-border); box-shadow: var(--focus-ring); }
 .clr { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: var(--muted); }
 .clr:hover { background: var(--panel-2); color: var(--fg); }
-.ff-picker-pop { position: fixed; z-index: 1100; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-2); overflow: hidden; }
+.ff-picker-pop { -webkit-app-region: no-drag; position: fixed; z-index: 1100; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-2); overflow: hidden; }
 .ff-picker-pop.up { transform: translateY(-100%); }
 .search { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--muted); }
 .search input { flex: 1; border: 0; background: none; outline: none; color: var(--fg); font-size: var(--fs-base); }
