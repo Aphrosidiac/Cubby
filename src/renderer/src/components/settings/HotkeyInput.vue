@@ -73,5 +73,5 @@ const shown = computed(() => (recording.value ? (live.value ? pretty(live.value)
 .box.rec { border-color: var(--focus-border); box-shadow: var(--focus-ring); }
 .box.rec kbd { border-color: var(--fg); color: var(--fg); }
 kbd { font-size: var(--fs-xs); padding: 3px 8px; }
-.ph { color: var(--faint); font-size: var(--fs-sm); }
+.ph { color: var(--muted); font-size: var(--fs-sm); }
 </style>

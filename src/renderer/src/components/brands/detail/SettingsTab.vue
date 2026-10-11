@@ -15,6 +15,7 @@ import { normalizeUrl } from '../actions';
 import { api } from '@/lib/api';
 import { app } from '@/lib/store';
 import { useLoad } from '@/composables/useLoad';
+import { guardUnsaved } from '@/components/settings/useSection';
 import { fail, ok } from '@/composables/toast';
 
 /** Every brand field on one page with a save bar: identity, startup pages, window, downloads, Chrome install, approval. */
@@ -29,6 +30,7 @@ type Form = ReturnType<typeof snap>;
 const form = reactive<Form>(snap(props.brand));
 const base = ref(JSON.stringify(snap(props.brand)));
 const dirty = computed(() => JSON.stringify(form) !== base.value);
+guardUnsaved(() => dirty.value);
 // a live update from elsewhere refreshes the form only when there is nothing unsaved
 watch(() => props.brand, b => { if (!dirty.value) { Object.assign(form, snap(b)); base.value = JSON.stringify(snap(b)); } });
 

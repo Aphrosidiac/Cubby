@@ -17,7 +17,7 @@ import { confirm } from '@/composables/confirm';
 import { fail, ok } from '@/composables/toast';
 
 /** Approval default, quiet hours, catch-up, and the pacing table (platform × account age). */
-const { form, dirty, busy, save, discard } = useSection(['approvalDefault', 'quietHours', 'catchUp']);
+const { form, dirty, busy, save, discard } = useSection(['approvalDefault', 'quietHours', 'catchUp'], { alsoDirty: () => rulesDirty.value });
 
 const rules = useLoad(() => api('pacing.rules'));
 const edit = ref<PacingRule[]>([]);

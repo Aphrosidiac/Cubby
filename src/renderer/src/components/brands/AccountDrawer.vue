@@ -24,7 +24,7 @@ const defaultLink = (a: Pick<Account, 'platform' | 'handle'>) => (a.platform ===
 watch(() => props.open, o => {
   if (!o) return;
   const a = props.account;
-  Object.assign(draft, newDraft(a?.platform ?? 'instagram'), a ? { handle: a.handle, displayName: a.displayName ?? '', profileUrl: a.profileUrl && a.profileUrl !== defaultLink(a) ? a.profileUrl : '', ageTier: a.ageTier, notes: a.notes ?? '', saveLogin: a.hasUsername || a.hasPassword || a.hasTotp } : {});
+  Object.assign(draft, newDraft(a?.platform ?? 'instagram'), a ? { handle: cleanHandle(a.platform, a.handle), displayName: a.displayName ?? '', profileUrl: a.profileUrl && a.profileUrl !== defaultLink(a) ? a.profileUrl : '', ageTier: a.ageTier, notes: a.notes ?? '', saveLogin: a.hasUsername || a.hasPassword || a.hasTotp } : {});
   cleared.clear();
   tried.value = false;
 });
@@ -48,7 +48,8 @@ async function save() {
       const link = draft.profileUrl.trim() || defaultLink({ platform: was.platform, handle: i.handle });
       // only what changed, so the activity log says what really happened
       const patch: In<'accounts.update'>['patch'] = {};
-      if (i.handle !== was.handle) patch.handle = i.handle;
+      // the stored handle may carry an "@" the field shows as a prefix: compare the cleaned forms
+      if (i.handle !== cleanHandle(was.platform, was.handle)) patch.handle = i.handle;
       if (draft.displayName.trim() !== (was.displayName ?? '')) patch.displayName = draft.displayName.trim();
       if (link !== (was.profileUrl ?? '')) patch.profileUrl = link;
       if (i.ageTier !== was.ageTier) patch.ageTier = i.ageTier;
