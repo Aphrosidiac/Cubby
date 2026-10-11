@@ -1,6 +1,6 @@
-# Brand Browsers — Plan v2 (complete desktop app)
+# Cubby — Plan v2 (complete desktop app)
 
-> Working name until one is picked. Status: **plan, nothing built**. v2 written 2026-10-11:
+> Every brand gets its own cubby. Status: **plan, nothing built**. v2 written 2026-10-11:
 > v1 was a CLI + MCP with no home app; v2 is a complete AdsPower-style desktop app.
 > The hosted version (Dalang, `~/Desktop/dev/Dalang`) is parked on cost.
 
@@ -122,7 +122,7 @@ Activity     id, at, actor(you|claude|scheduler|flow|api), brandId?, action, det
 Setting      key, value
 ```
 
-Files live in `~/Library/Application Support/<App>/` (Mac) or `%APPDATA%\<App>\` (Windows):
+Files live in `%APPDATA%\Cubby\` (Windows) or `~/Library/Application Support/Cubby/` (Mac):
 `app.sqlite`, `profiles/<slug>/` (each brand's Chrome profile), `screens/`, `thumbs/`, `exports/`.
 
 ---
@@ -346,13 +346,13 @@ docs/
 
 | Phase | Builds | Done when |
 |---|---|---|
-| **0 · Checks** (1 session) | Several brand Chromes driven at once; no stalls when covered (measured); `setInputFiles` on FB/IG/TikTok; import from your "Work" profile keeps FF logins; theme colour via Preferences; cookie names | `docs/PHASE0.md` with results |
+| **0 · Checks** (1 session, on the Windows dev machine) | Several brand Chromes driven at once; no stalls when covered (measured); `setInputFiles` on FB/IG/TikTok; import from your "Work" profile keeps FF logins; theme colour via Preferences; cookie names | `docs/PHASE0.md` with results |
 | **1 · Home app** | Electron shell, Home (table/cards, groups, tags, search, filters, batch actions), New brand wizard, Brand detail (Overview, Settings), open/close/crash detection, tile/cascade, tray, quick switcher, recycle bin | You manage every brand from the app like AdsPower |
 | **2 · Accounts & health** | Account manager (Keychain, Fill login, 2FA codes), login health + notifications, Cookies tab, Extensions tab, import from Chrome profile | Every brand shows its login state; relogin is two clicks |
 | **3 · Claude** | Local API, MCP + all guardrails, Claude page (status, Stop, Connect Claude Code, tokens), Activity | Claude Code posts to the right brand through the app; Stop works mid-run |
 | **4 · Posting** | Media library + watch folders, Composer, recipes (IG reel/carousel, FB reel, TikTok first), Approvals, Calendar/Queue, slots, scheduler | A week of scheduled FF + Ascend posts approved in the app; zero wrong-account posts, zero rate-limit flags |
 | **5 · Flows** | Flow builder, recorder, schedules, more recipes (YT Shorts, Threads, X, LinkedIn, stories) | You build and schedule a custom flow without code |
-| **6 · Ship** | Backups, brand export/import, Windows build, installers, auto-update, polish | Install on another machine and import your brands |
+| **6 · Ship** | Backups, brand export/import, Windows + Mac builds, installers, auto-update, polish | Install on another machine and import your brands |
 
 ---
 
@@ -380,7 +380,7 @@ docs/
 ## 17. Decisions
 | # | Decision | Recommendation |
 |---|---|---|
-| L1 | Name | see chat |
+| L1 | Name | **Cubby** (decided 2026-10-11) |
 | L2 | First brands | FF + Ascend |
 | L3 | Approval default | On |
 | L4 | Seed FF from your "Work" Chrome profile | Yes, if Phase 0 confirms |
