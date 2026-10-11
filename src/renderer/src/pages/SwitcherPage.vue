@@ -29,6 +29,7 @@ watch(q, () => { active.value = 0; err.value = null; });
 watch(active, () => void nextTick(() => listEl.value?.querySelector('.it.act')?.scrollIntoView({ block: 'nearest' })));
 
 const close = () => window.cubby?.closeSwitcher?.();
+function newBrand() { api('app.showInMain', { path: '/brands/new' }).then(close).catch(x => (err.value = (x as Error).message)); }
 async function go(b: BrandRow | undefined) {
   if (!b || busy.value) return;
   busy.value = b.id;
@@ -75,7 +76,10 @@ onBeforeUnmount(() => {
           <li v-for="i in 4" :key="i" class="it"><div class="skel" style="width: 32px; height: 32px; border-radius: 8px" /><div class="skel-line" :style="{ width: `${100 + i * 30}px` }" /></li>
         </template>
         <li v-else-if="brands.error.value" class="none">Could not load brands — {{ brands.error.value }}</li>
-        <li v-else-if="!brands.data.value?.length" class="none">No brands yet. Create one in Cubby.</li>
+        <li v-else-if="!brands.data.value?.length" class="none">
+          <span>No brands yet.</span>
+          <button type="button" class="link" @mousedown.prevent="newBrand">Create one in Cubby</button>
+        </li>
         <li v-else-if="!shown.length" class="none">No brand matches “{{ q }}”.</li>
         <li v-for="(b, i) in shown" :key="b.id" class="it" :class="{ act: i === active }" role="option" :aria-selected="i === active" @mouseenter="active = i" @mousedown.prevent="go(b)">
           <BrandAvatar :brand="b" :size="32" />
@@ -129,7 +133,8 @@ html.switcher-win, html.switcher-win body { background: transparent !important; 
 .go { display: none; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--fg-2); white-space: nowrap; }
 .it.act .go { display: inline-flex; }
 .it.act .st { display: none; }
-.none { padding: 28px 16px; text-align: center; color: var(--muted); font-size: var(--fs-sm); }
+.none { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; padding: 28px 16px; text-align: center; color: var(--muted); font-size: var(--fs-sm); }
+.none .link { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
 .ft { display: flex; align-items: center; gap: 16px; height: 38px; padding: 0 16px; border-top: 1px solid var(--line-soft); font-size: var(--fs-xs); color: var(--muted); flex: none; }
 .ft span { display: inline-flex; align-items: center; gap: 4px; }
 .ft .bad { color: var(--bad); display: block; }

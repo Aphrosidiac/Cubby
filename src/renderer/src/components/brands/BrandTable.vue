@@ -257,6 +257,8 @@ th.sortable:focus-visible { outline: none; color: var(--fg); box-shadow: inset 0
 td { padding: 10px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; font-size: var(--fs-base); transition: background-color 180ms; overflow: hidden; }
 tr.br { cursor: pointer; outline: none; }
 tr.br:hover td, tr.br.sel td { background: var(--panel-hover); }
+/* chips and account plates are panel-2: on a highlighted row (≈ panel-2 in dark) step them up a shade */
+tr.br:hover, tr.br.sel, tr.br:focus-visible { --panel-2: var(--line); }
 tr.br.sel td { background: color-mix(in srgb, var(--panel-hover) 70%, var(--panel-2)); }
 tr.br:focus-visible td { background: var(--panel-hover); box-shadow: inset 0 -1px 0 var(--fg); }
 tr.br:focus-visible td:first-child { box-shadow: inset 3px 0 0 var(--fg), inset 0 -1px 0 var(--fg); }
@@ -291,7 +293,7 @@ td.c-act, td.c-menu { overflow: visible; }
 [data-theme='dark'] .swatch { box-shadow: inset 0 0 0 1px rgb(243 239 228 / .3); }
 .tags { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .tg { flex: 0 1 auto; min-width: 0; height: 21px; padding: 0 8px; border-radius: var(--r-pill); background: var(--panel-2); color: var(--fg-2); font-size: var(--fs-xs); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background-color 160ms, color 160ms; }
-button.tg:hover { background: var(--line); color: var(--fg); }
+button.tg:hover { background: var(--line-strong); color: var(--fg); }
 .tg-more { flex: none; display: inline-flex; align-items: center; height: 21px; padding: 0 7px; border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); cursor: help; font-family: var(--mono); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .plats { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
 .acc-more { flex: none; display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-family: var(--mono); font-size: var(--fs-2xs); cursor: help; }

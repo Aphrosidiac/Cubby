@@ -35,9 +35,9 @@ onMounted(() => {
         <CubbyMark :size="collapsed ? 26 : 24" />
         <span v-if="!collapsed" class="name">Cubby</span>
       </RouterLink>
-      <button v-if="!collapsed" class="collapse" aria-label="Collapse sidebar" @click="$emit('toggle')"><Icon name="sidebar" :size="16" /></button>
+      <button v-if="!collapsed" type="button" class="collapse" aria-label="Collapse sidebar" title="Collapse sidebar" @click="$emit('toggle')"><Icon name="sidebar" :size="16" /></button>
     </div>
-    <button v-if="collapsed" class="collapse expand" aria-label="Expand sidebar" @click="$emit('toggle')"><Icon name="sidebar" :size="16" /></button>
+    <button v-if="collapsed" type="button" class="collapse expand" aria-label="Expand sidebar" title="Expand sidebar" @click="$emit('toggle')"><Icon name="sidebar" :size="16" /></button>
     <nav ref="nav" class="nav" aria-label="Main">
       <span class="marker" :class="{ show: marker.show }" :style="{ transform: `translateY(${marker.y}px)`, height: `${marker.h}px` }" />
       <template v-for="(g, gi) in NAV" :key="gi">

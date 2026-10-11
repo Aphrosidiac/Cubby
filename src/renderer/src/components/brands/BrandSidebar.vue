@@ -100,7 +100,7 @@ const showAllTags = ref(false);
       <div v-if="groups === null" class="skel-line" style="width: 70%; margin: 10px 10px" />
       <div v-for="(g, i) in groups ?? []" :key="g.id" class="it-row" :class="{ on: filter.groupId === g.id }">
         <button type="button" class="it" :class="{ on: filter.groupId === g.id }" @click="only(filter.groupId === g.id ? {} : { groupId: g.id })">
-          <span class="swatch" :style="{ background: g.color }" /><span class="grow ellipsis">{{ g.name }}</span><span class="n num">{{ g.count || '' }}</span>
+          <span class="swatch" :style="{ background: g.color }" /><span class="grow ellipsis" :title="g.name">{{ g.name }}</span><span class="n num">{{ g.count }}</span>
         </button>
         <Menu :items="groupMenu(g, i)" :width="200">
           <button type="button" class="dots" :aria-label="`Edit group ${g.name}`"><Icon name="more" :size="16" :stroke="3" /></button>
@@ -120,7 +120,7 @@ const showAllTags = ref(false);
       <div class="sec">
         <div v-for="t in showAllTags ? tags : tags.slice(0, 10)" :key="t.id" class="it-row" :class="{ on: filter.tag === t.name }">
           <button type="button" class="it" :class="{ on: filter.tag === t.name }" @click="only(filter.tag === t.name ? {} : { tag: t.name })">
-            <Icon name="hash" :size="14" /><span class="grow ellipsis">{{ t.name }}</span><span class="n num">{{ t.count || '' }}</span>
+            <Icon name="hash" :size="14" /><span class="grow ellipsis" :title="t.name">{{ t.name }}</span><span class="n num">{{ t.count }}</span>
           </button>
           <Menu :items="tagMenu(t)" :width="180">
             <button type="button" class="dots" :aria-label="`Edit tag ${t.name}`"><Icon name="more" :size="16" :stroke="3" /></button>

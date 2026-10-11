@@ -31,6 +31,10 @@ const counts = computed(() => ({
   runs: app.status?.runs.length ?? 0
 }))
 const claudeRun = computed(() => app.status?.runs.find((r) => r.actor === 'claude') ?? app.status?.runs[0] ?? null)
+const ACTOR: Record<string, string> = { claude: 'Claude', scheduler: 'Scheduler', flow: 'Flow', api: 'API', you: 'Run' }
+const runLabel = computed(() => (claudeRun.value ? `${ACTOR[claudeRun.value.actor] ?? 'Run'} · ${claudeRun.value.brandName}` : ''))
+const moreRuns = computed(() => Math.max(0, (app.status?.runs.length ?? 0) - 1))
+const runLink = computed(() => (claudeRun.value?.actor === 'claude' ? '/claude' : claudeRun.value ? `/runs/${claudeRun.value.runId}` : '/flows'))
 
 async function kill(onOff: boolean) {
   try {
@@ -67,6 +71,7 @@ const THEME = [
   { label: 'Dark', icon: 'moon', run: () => void setTheme('dark') },
   { label: 'Match system', icon: 'monitor', run: () => void setTheme('system') }
 ]
+const themeName = computed(() => (app.settings?.theme === 'dark' ? 'dark' : app.settings?.theme === 'light' ? 'light' : 'match system'))
 const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.settings?.theme === 'light' ? 'sun' : 'monitor'))
 </script>
 
@@ -76,19 +81,19 @@ const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.
     <div class="main">
       <header class="top">
         <button class="search" aria-label="Search or jump to" @click="palette = true">
-          <Icon name="search" :size="16" /><span class="grow search-t">Search brands, handles, pages…</span><kbd>{{ modKey }} K</kbd>
+          <Icon name="search" :size="16" /><span class="grow search-t"><span class="st-long">Search brands, handles, pages…</span><span class="st-short">Search…</span></span><kbd>{{ modKey }} K</kbd>
         </button>
         <div class="grow" />
         <Transition name="fade">
           <button v-if="app.status?.killSwitch" class="pill stopped" title="Kill switch is on — click to resume" @click="kill(false)"><span class="dot" />Stopped · Resume</button>
-          <RouterLink v-else-if="claudeRun" to="/claude" class="pill working" :title="claudeRun.step ?? claudeRun.label">
-            <span class="dot" />{{ claudeRun.actor === 'claude' ? 'Claude' : claudeRun.actor === 'scheduler' ? 'Scheduler' : 'Flow' }} · {{ claudeRun.brandName }}
+          <RouterLink v-else-if="claudeRun" :to="runLink" class="pill working" :title="`${claudeRun.label}${claudeRun.step ? ` — ${claudeRun.step}` : ''}${moreRuns ? ` (and ${moreRuns} more running)` : ''}`">
+            <span class="dot" /><span class="pill-t">{{ runLabel }}</span><span v-if="moreRuns" class="pill-n num">+{{ moreRuns }}</span>
           </RouterLink>
         </Transition>
         <button v-if="!app.status?.killSwitch" class="stop" title="Stop all automation (kill switch)" @click="kill(true)"><Icon name="stop" :size="14" /><span>Stop</span></button>
         <Btn variant="primary" size="sm" icon="plus" to="/brands/new">New brand</Btn>
         <Menu :items="THEME" :width="190">
-          <button class="theme" :aria-label="`Theme`"><Icon :name="themeIcon" :size="17" /></button>
+          <button type="button" class="theme" :aria-label="`Theme: ${themeName}`" :title="`Theme: ${themeName}`"><Icon :name="themeIcon" :size="17" /></button>
         </Menu>
         <div class="wc-space" />
       </header>
@@ -113,15 +118,26 @@ const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.
 .top .grow { -webkit-app-region: drag; }
 .wc-space { width: 140px; flex: none; -webkit-app-region: drag; }
 .mac .wc-space { width: 16px; }
-.search { display: flex; align-items: center; gap: 10px; width: min(420px, 38vw); height: 36px; padding: 0 8px 0 14px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: var(--fs-base); text-align: left; transition: border-color 200ms, box-shadow 300ms var(--ease-out); }
+/* At the minimum window width the search pill gives way first (never below 140px), so the
+   right-hand controls never slide under the Windows caption buttons. */
+.search { display: flex; align-items: center; gap: 10px; flex: 0 1 420px; min-width: 140px; height: 36px; padding: 0 8px 0 14px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: var(--fs-base); text-align: left; transition: border-color 200ms, box-shadow 300ms var(--ease-out); }
 .search:hover { border-color: var(--line-strong); box-shadow: var(--shadow-1); }
+.search { container-type: inline-size; }
 .search-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search kbd { white-space: nowrap; flex: none; }
+.st-short { display: none; }
+@container (max-width: 250px) { .st-long { display: none; } .st-short { display: inline; } }
+@container (max-width: 150px) { .search kbd { display: none; } }
 .pill { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 99px; font-size: var(--fs-sm); font-weight: 500; white-space: nowrap; }
 .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; position: relative; }
 .pill .dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: currentColor; animation: ff-pulse 2.4s var(--ease-out) infinite; }
-.working { background: var(--info-bg); color: var(--info); }
+.working { flex: 0 1 auto; max-width: 260px; min-width: 96px; background: var(--info-bg); color: var(--info); transition: background-color 200ms; }
+.working:hover { background: color-mix(in srgb, var(--info) 18%, var(--info-bg)); }
+.pill-t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pill-n { flex: none; font-family: var(--mono); font-size: var(--fs-2xs); opacity: .85; }
+.pill .dot { flex: none; }
 .stopped { background: var(--bad-bg); color: var(--bad); }
+.stop, .stopped { flex: none; }
 .stop { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--bad) 35%, transparent); color: var(--bad); font-size: var(--fs-sm); font-weight: 500; transition: background-color 200ms, color 200ms; }
 .stop:hover { background: var(--bad); color: #fff; }
 .theme { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--fg-2); transition: background-color 200ms, color 200ms; }

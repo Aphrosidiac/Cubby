@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // New brand wizard (PLAN 6.2): identity → platforms → browser → review → create → "Open and log in".
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import type { BrandRow, ChromeProfileInfo, Platform } from '@shared/types';
 import { PLATFORMS } from '@shared/types';
@@ -41,7 +41,14 @@ const STEPS: { key: Step; label: string }[] = [
 const step = ref<Step>('identity');
 const idx = computed(() => STEPS.findIndex(s => s.key === step.value));
 const reached = ref(0);
-watch(idx, i => (reached.value = Math.max(reached.value, i)));
+watch(idx, i => {
+  reached.value = Math.max(reached.value, i);
+  // a new step starts at its top: if the stepper scrolled away (long platforms list), bring it back
+  void nextTick(() => {
+    const s = document.querySelector<HTMLElement>('.nb .stepper-wrap');
+    if (s && s.getBoundingClientRect().top < 64) s.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+});
 
 const PALETTE = ['#0b0b0a', '#2c4f9c', '#1d6b45', '#a3261d', '#8a5a00', '#6b3fa0', '#0f766e', '#be185d', '#475569', '#b45309'];
 const PRESETS = [{ value: '1280x900', label: '1280 × 900' }, { value: '1440x900', label: '1440 × 900' }, { value: '1920x1080', label: '1920 × 1080' }, { value: 'custom', label: 'Custom' }];
@@ -61,7 +68,15 @@ const tags = useLoad(() => api('tags.list'));
 const groups = useLoad(() => api('groups.list'), { topics: ['brands.changed'] });
 const groupLabel = computed(() => (form.groupId ? groups.data.value?.find(g => g.id === form.groupId)?.name ?? '—' : 'No group'));
 const nameInput = ref<HTMLInputElement | null>(null);
-onMounted(() => setTimeout(() => nameInput.value?.focus(), 250));
+/** Focus the name field and make sure it is really in view (on a 620px-high window it starts under the sticky footer). */
+function focusName() {
+  const el = nameInput.value;
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  const r = el.getBoundingClientRect();
+  if (r.bottom > window.innerHeight - 96 || r.top < 64) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+onMounted(() => setTimeout(focusName, 250));
 
 // ── platforms ──
 const used = computed(() => new Set(form.accounts.map(a => a.platform)));
@@ -70,7 +85,7 @@ function removeAt(i: number) { form.accounts.splice(i, 1); }
 const QUICK = PLATFORMS.filter(p => p !== 'custom');
 
 // startup URLs follow the chosen platforms until edited by hand
-const homeUrls = computed(() => [...new Set(form.accounts.map(a => PLATFORM_SPECS[a.platform]?.home).filter(u => u && u !== 'about:blank'))]);
+const homeUrls = computed(() => [...new Set(form.accounts.map(a => (a.platform === 'custom' ? (cleanHandle('custom', a.handle) ? normalizeUrl(cleanHandle('custom', a.handle)) : '') : PLATFORM_SPECS[a.platform]?.home)).filter(u => u && u !== 'about:blank'))]);
 watch(homeUrls, u => { if (!form.urlsTouched) form.startupUrls = [...u]; }, { immediate: true });
 function setUrl(i: number, v: string) { form.urlsTouched = true; form.startupUrls[i] = v; }
 function addUrl() { form.urlsTouched = true; form.startupUrls.push(''); void nextTick(() => document.querySelector<HTMLInputElement>('.urls li:last-child input')?.focus()); }
@@ -134,18 +149,25 @@ async function openAndLogin() {
 function another() {
   Object.assign(form, fresh());
   created.value = null; step.value = 'identity'; reached.value = 0; tried.value = new Set();
-  setTimeout(() => nameInput.value?.focus(), 300);
+  setTimeout(focusName, 300);
 }
 async function csv() { const n = await pickCsvAndCreate(); if (n) void router.push('/'); }
 
+// Ctrl/⌘+Enter anywhere on the page (focus often lands on <body> after a step swaps its buttons),
+// but not while a dialog or dropdown has the keyboard
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (step.value === 'review') void create(); else next(); }
+  if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || created.value || creating.value) return;
+  if (document.querySelector('.modal-root, .ff-select-pop, .cp-root')) return;
+  e.preventDefault();
+  if (step.value === 'review') void create(); else next();
 }
+onMounted(() => window.addEventListener('keydown', onKey));
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.height); return { width: `${Math.round(form.width * s)}px`, height: `${Math.round(form.height * s)}px` }; });
 </script>
 
 <template>
-  <div class="page nb" @keydown="onKey">
+  <div class="page nb">
     <PageHeader eyebrow="New brand" :title="created ? 'Brand created' : 'New brand'" :back="{ to: '/', label: 'Brands' }">
       <span v-if="!created">Its own sealed Chrome profile: logins, cookies and extensions stay inside this brand.</span>
       <template v-if="!created" #actions>
@@ -297,6 +319,11 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
     </template>
   </div>
 </template>
+
+<style>
+/* Tab / focus scrolling clears the sticky top bar and the sticky wizard footer */
+html:has(.page.nb) { scroll-padding: 72px 0 96px; }
+</style>
 
 <style scoped>
 .nb { max-width: 860px; margin: 0 auto; }

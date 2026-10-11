@@ -130,8 +130,8 @@ async function batch(action: 'open' | 'close' | 'health', label: string) {
   batchBusy.value = action;
   try {
     const r = await api('brands.batch', { ids, action });
-    if (r.errors.length) toast(`${label}: ${r.ok} done, ${r.errors.length} failed`, { tone: 'warn', body: r.errors.slice(0, 3).join(' · ') });
-    else ok(`${label}: ${r.ok} brand${r.ok === 1 ? '' : 's'}`);
+    if (r.errors.length) toast(`${label} ${r.ok} of ${ids.length} — ${r.errors.length} failed`, { tone: 'warn', body: r.errors.slice(0, 3).join(' · ') });
+    else ok(`${label} ${r.ok} brand${r.ok === 1 ? '' : 's'}`);
   } catch (e) { fail(e, `${label} failed`); } finally { batchBusy.value = null; }
 }
 async function batchDelete() { if (await act.remove(selRows.value)) selected.value = new Set(); }
@@ -174,9 +174,10 @@ async function arrange(mode: 'tile' | 'cascade') {
   try { await api('brands.arrange', { mode, ids: ids.length ? ids : undefined }); } catch (e) { fail(e, mode === 'tile' ? 'Could not tile windows' : 'Could not cascade windows'); } finally { arranging.value = null; }
 }
 async function closeAll() {
-  if (!(await confirm({ title: `Close all ${openIds.value.length} open brand windows?`, body: 'Logins and tabs are kept — Chrome restores them next time each brand opens.', confirm: 'Close all' }))) return;
+  const n = openIds.value.length;
+  if (!(await confirm({ title: n === 1 ? 'Close the open brand window?' : `Close all ${n} open brand windows?`, body: n === 1 ? 'Logins and tabs are kept — Chrome restores them next time the brand opens.' : 'Logins and tabs are kept — Chrome restores them next time each brand opens.', confirm: n === 1 ? 'Close it' : 'Close all' }))) return;
   arranging.value = 'close';
-  try { await api('brands.closeAll'); ok('All brand windows closed'); } catch (e) { fail(e); } finally { arranging.value = null; }
+  try { await api('brands.closeAll'); ok(n === 1 ? 'Brand window closed' : 'All brand windows closed'); } catch (e) { fail(e); } finally { arranging.value = null; }
 }
 
 // ── reorder (only when the list is in its own order) ──
