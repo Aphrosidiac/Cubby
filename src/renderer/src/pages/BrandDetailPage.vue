@@ -33,6 +33,8 @@ const router = useRouter();
 const act = useBrandActions();
 const id = computed(() => String(route.params.id ?? ''));
 const brand = useLoad(() => api('brands.get', { id: id.value }), { topics: ['brands.changed', 'accounts.changed'], deps: [id] });
+// window / taskbar title names the brand
+watch(() => brand.data.value?.name, (n) => { if (n) document.title = `${n} — Cubby`; }, { immediate: true });
 const b = computed<BrandRow | null>(() => brand.data.value);
 const off = on('brand.status', e => { if (b.value && e.id === b.value.id) brand.data.value = { ...b.value, status: e.status, statusError: e.error ?? null, lastOpenedAt: e.status === 'open' ? new Date().toISOString() : b.value.lastOpenedAt }; });
 onBeforeUnmount(off);

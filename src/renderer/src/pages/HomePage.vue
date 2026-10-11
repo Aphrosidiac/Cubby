@@ -75,6 +75,12 @@ onBeforeUnmount(() => { ro?.disconnect(); document.removeEventListener('mousedow
 // ── filter + search ──
 const filter = reactive<BrandFilter>({});
 const q = ref(typeof route.query.q === 'string' ? route.query.q : '');
+// opened from a .brand file (Explorer / Finder double-click → `/?import=<path>`)
+watch(() => route.query.import, async (p) => {
+  if (typeof p !== 'string' || !p) return;
+  void router.replace({ query: { ...route.query, import: undefined } });
+  await importBrandFile(p);
+}, { immediate: true });
 const qLive = ref(q.value);
 let qt = 0;
 watch(q, v => { clearTimeout(qt); qt = window.setTimeout(() => (qLive.value = v.trim()), 140); });
@@ -260,7 +266,7 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
     <EmptyState v-else-if="firstRun" icon="cubby" title="Create your first brand" body="Each brand gets its own sealed Chrome profile — its own logins, cookies and extensions — opened from here like AdsPower. Start with one, or bring several in from a CSV.">
       <Btn variant="primary" icon="plus" to="/brands/new">New brand</Btn>
       <Btn icon="file" @click="pickCsvAndCreate">Import CSV</Btn>
-      <Btn variant="subtle" icon="upload" @click="importBrandFile">Import .brand</Btn>
+      <Btn variant="subtle" icon="upload" @click="importBrandFile()">Import .brand</Btn>
     </EmptyState>
 
     <div v-else class="layout">

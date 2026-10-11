@@ -45,10 +45,10 @@ export function pickCsvAndCreate(): Promise<number> {
   });
 }
 
-/** Pick an encrypted .brand export, ask its passphrase, import. */
-export async function importBrandFile(): Promise<number> {
+/** Pick an encrypted .brand export (or use `given`, e.g. a file double-clicked in Explorer), ask its passphrase, import. */
+export async function importBrandFile(given?: string): Promise<number> {
   try {
-    const [path] = await api('app.pickFiles', { filters: [{ name: 'Cubby brand export', extensions: ['brand'] }] });
+    const path = (typeof given === 'string' ? given : undefined) ?? (await api('app.pickFiles', { filters: [{ name: 'Cubby brand export', extensions: ['brand'] }] }))[0];
     if (!path) return 0;
     const passphrase = await confirm({ title: 'Import brands', body: `${path.split(/[\\/]/).pop()}\nEnter the passphrase it was exported with.`, confirm: 'Import', input: { label: 'Passphrase', password: true } });
     if (!passphrase) return 0;

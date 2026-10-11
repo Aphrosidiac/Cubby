@@ -139,7 +139,7 @@ const exportNames = computed(() => (exportIds.value ?? []).map(id => brands.data
     </div>
     <div class="set-row">
       <div class="set-l"><span class="t">Move brands to another computer</span><span class="d">Export makes an encrypted .brand file with settings, accounts and cookies; import it in Cubby on the other computer. Some platforms may ask to verify the new device.</span></div>
-      <div class="set-c"><div class="set-pair"><Btn size="sm" icon="download" :disabled="!brands.data.value?.length" @click="openPick">Export brands…</Btn><Btn size="sm" icon="upload" @click="importBrandFile">Import .brand…</Btn></div></div>
+      <div class="set-c"><div class="set-pair"><Btn size="sm" icon="download" :disabled="!brands.data.value?.length" @click="openPick">Export brands…</Btn><Btn size="sm" icon="upload" @click="importBrandFile()">Import .brand…</Btn></div></div>
     </div>
 
     <SaveBar :show="dirty" :busy="busy" :disabled="!cronOk || !(form.backup.keep >= 1)" @save="save('Backup settings saved')" @discard="discard" />
