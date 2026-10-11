@@ -35,9 +35,9 @@ onMounted(() => {
         <CubbyMark :size="collapsed ? 26 : 24" />
         <span v-if="!collapsed" class="name">Cubby</span>
       </RouterLink>
-      <button v-if="!collapsed" class="collapse" aria-label="Collapse sidebar" @click="$emit('toggle')"><Icon name="sidebar" :size="16" /></button>
+      <button v-if="!collapsed" type="button" class="collapse" aria-label="Collapse sidebar" title="Collapse sidebar" @click="$emit('toggle')"><Icon name="sidebar" :size="16" /></button>
     </div>
-    <button v-if="collapsed" class="collapse expand" aria-label="Expand sidebar" @click="$emit('toggle')"><Icon name="sidebar" :size="16" /></button>
+    <button v-if="collapsed" type="button" class="collapse expand" aria-label="Expand sidebar" title="Expand sidebar" @click="$emit('toggle')"><Icon name="sidebar" :size="16" /></button>
     <nav ref="nav" class="nav" aria-label="Main">
       <span class="marker" :class="{ show: marker.show }" :style="{ transform: `translateY(${marker.y}px)`, height: `${marker.h}px` }" />
       <template v-for="(g, gi) in NAV" :key="gi">
@@ -64,15 +64,15 @@ onMounted(() => {
 .side a, .side button { -webkit-app-region: no-drag; }
 .collapsed { width: var(--sidebar-rail); }
 .brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: var(--topbar); padding: 0 12px 0 20px; }
-:global(.mac) .brand { padding-left: 86px; }
+.mac .brand { padding-left: 86px; }
 .collapsed .brand { padding: 0; justify-content: center; }
-:global(.mac) .collapsed .brand { padding-top: 26px; }
+.mac .collapsed .brand { padding-top: 26px; }
 .logo { display: flex; align-items: center; gap: 10px; color: var(--side-fg); }
 .name { font-size: var(--fs-md); font-weight: 600; letter-spacing: -.01em; }
 .collapse { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--side-muted); transition: background-color 200ms, color 200ms; }
 .collapse:hover { background: var(--side-hover); color: var(--side-fg); }
 .expand { margin: 0 auto 4px; }
-.nav { position: relative; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 10px 28px; scrollbar-color: #2a2a27 transparent; }
+.nav { position: relative; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 10px 28px; }
 .group { margin: 16px 12px 6px; font-family: var(--mono); font-size: var(--fs-2xs); letter-spacing: .12em; text-transform: uppercase; color: var(--side-muted); height: 12px; display: flex; align-items: center; }
 .gline { display: block; width: 100%; height: 1px; background: var(--side-line); }
 .collapsed .group { margin: 12px 8px 6px; }

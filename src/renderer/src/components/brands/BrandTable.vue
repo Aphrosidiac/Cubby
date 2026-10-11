@@ -9,13 +9,15 @@ import BrandAvatar from '@/components/common/BrandAvatar.vue';
 import AccountBadge from '@/components/common/AccountBadge.vue';
 import BrandStatus from './BrandStatus.vue';
 import { useBrandActions } from './actions';
-import { serialText } from '@/components/common/login';
+import { accountTip, serialText } from '@/components/common/login';
 import { ago, dateTime } from '@/lib/format';
 
 /**
  * The brands table (AdsPower's profile list, FF Ops' hairline table). Selection with checkboxes
  * (Shift-click for a range), sortable heads, drag the grip to reorder when unsorted, Enter opens the
- * brand's window, a click opens its page. Columns fold away as the window narrows.
+ * brand's window, a click opens its page. Fixed layout: the table is never wider than its container.
+ * Lower-priority columns fold away as it narrows (serial → last opened → group → tags → status →
+ * accounts); the folded serial and group reappear under the brand name.
  */
 export type SortKey = 'serial' | 'name' | 'group' | 'tags' | 'platforms' | 'status' | 'lastOpenedAt';
 const props = defineProps<{
@@ -56,6 +58,9 @@ function toggleSort(k?: SortKey) {
   if (!k) return;
   const s = props.sort;
   emit('update:sort', s?.key === k ? (s.dir === 1 ? { key: k, dir: -1 } : null) : { key: k, dir: 1 });
+}
+function sortKey(e: KeyboardEvent, k?: SortKey) {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort(k); }
 }
 
 // ── selection ──
@@ -132,7 +137,28 @@ watch(() => props.rows, rows => {
   if (next.size) { flashing.value = next; setTimeout(() => (flashing.value = new Set()), 1700); }
 }, { immediate: true });
 
-const MAX_TAGS = 2;
+/**
+ * Tags that fit the column on one line (estimated from their length), the rest as "+N". At least one
+ * tag always shows; a lone long tag ellipsizes.
+ */
+const TAG_BUDGET = 146, MORE_W = 30;
+const tagW = (t: string) => 17 + t.length * 6.4 + 4;
+function tagsFit(b: BrandRow): { shown: string[]; rest: string[] } {
+  const shown: string[] = [];
+  let used = 0;
+  for (let i = 0; i < b.tags.length; i++) {
+    const w = tagW(b.tags[i]);
+    const tail = i < b.tags.length - 1 ? MORE_W : 0;
+    if (shown.length && used + w + tail > TAG_BUDGET) break;
+    shown.push(b.tags[i]);
+    used += w;
+  }
+  return { shown, rest: b.tags.slice(shown.length) };
+}
+/** account badges stay on one line: all of them up to 4, otherwise 3 and a "+N" chip */
+const MAX_ACC = 4;
+const accShown = (b: BrandRow) => (b.accounts.length <= MAX_ACC ? b.accounts : b.accounts.slice(0, MAX_ACC - 1));
+const accRest = (b: BrandRow) => (b.accounts.length <= MAX_ACC ? [] : b.accounts.slice(MAX_ACC - 1));
 </script>
 
 <template>
@@ -141,20 +167,21 @@ const MAX_TAGS = 2;
       <thead>
         <tr>
           <th class="c-sel">
-            <input type="checkbox" class="cb" :checked="allOn" :indeterminate="someOn" :disabled="!shown.length" aria-label="Select all shown brands" @change="toggleAll" />
+            <input type="checkbox" class="cb" :checked="allOn" :indeterminate="someOn" :disabled="!shown.length" aria-label="Select all shown brands" title="Select all shown brands" @change="toggleAll" />
           </th>
-          <th v-for="c in COLS" :key="c.key" :class="[c.cls, { sortable: !!c.sort, on: sort?.key === c.sort }]" :aria-sort="sort?.key === c.sort ? (sort!.dir === 1 ? 'ascending' : 'descending') : undefined" @click="toggleSort(c.sort)">
+          <th v-for="c in COLS" :key="c.key" :class="[c.cls, { sortable: !!c.sort, on: sort?.key === c.sort }]" :aria-sort="sort?.key === c.sort ? (sort!.dir === 1 ? 'ascending' : 'descending') : undefined"
+            :tabindex="c.sort ? 0 : undefined" :title="c.sort ? `Sort by ${c.label === '#' ? 'serial' : c.label.toLowerCase()}` : undefined" @click="toggleSort(c.sort)" @keydown="sortKey($event, c.sort)">
             <span class="th">{{ c.label }}<Icon v-if="sort && sort.key === c.sort" name="chevron-down" :size="11" :class="{ up: sort.dir === -1 }" /></span>
           </th>
-          <th class="c-act"><span class="sr-only">Open or close</span></th>
-          <th class="c-menu"><span class="sr-only">More</span></th>
+          <th class="c-act" aria-label="Open or close" />
+          <th class="c-menu" aria-label="More" />
         </tr>
       </thead>
       <tbody v-if="loading && !rows">
         <tr v-for="i in 6" :key="`s${i}`" class="skel-row">
-          <td class="c-sel"><div class="skel-line" style="width: 14px" /></td>
+          <td class="c-sel"><div class="skel-line" style="width: 14px; margin-left: 14px" /></td>
           <td class="c-serial"><div class="skel-line" style="width: 28px" /></td>
-          <td class="c-name"><div class="row gap-2"><div class="skel" style="width: 30px; height: 30px; border-radius: 8px" /><div class="skel-line" :style="{ width: `${[120, 90, 140, 100, 80, 110][i - 1]}px` }" /></div></td>
+          <td class="c-name"><div class="row gap-2"><div class="skel" style="width: 30px; height: 30px; border-radius: 8px; flex: none" /><div class="skel-line" :style="{ width: `${[120, 90, 140, 100, 80, 110][i - 1]}px`, maxWidth: '70%' }" /></div></td>
           <td class="c-group"><div class="skel-line" style="width: 60px" /></td>
           <td class="c-tags"><div class="skel-line" style="width: 70px" /></td>
           <td class="c-plat"><div class="skel-line" style="width: 64px" /></td>
@@ -177,26 +204,29 @@ const MAX_TAGS = 2;
           <td class="c-name">
             <div class="nm">
               <BrandAvatar :brand="b" :size="30" />
-              <div class="grow" :title="b.notes ? `${b.name} — ${b.notes}` : undefined">
-                <div class="row gap-1 nm-line"><span class="strong ellipsis">{{ b.name }}</span><Icon v-if="b.notes" name="note" :size="13" class="note-ic" /></div>
-                <div class="ser-inline code faint">{{ serialText(b.serial) }}<span v-if="b.groupName" class="si-g"> · {{ b.groupName }}</span></div>
+              <div class="grow" :title="b.notes ? `${b.name} — ${b.notes}` : b.name">
+                <div class="nm-line"><span class="strong ellipsis">{{ b.name }}</span><Icon v-if="b.notes" name="note" :size="13" class="note-ic" /></div>
+                <div class="ser-inline code muted ellipsis">{{ serialText(b.serial) }}<span v-if="b.groupName" class="si-g"> · {{ b.groupName }}</span></div>
               </div>
             </div>
           </td>
           <td class="c-group">
-            <span v-if="b.groupName" class="grp"><span class="swatch" :style="{ background: groupColor?.(b.groupId) ?? 'var(--faint)' }" /><span class="ellipsis">{{ b.groupName }}</span></span>
-            <span v-else class="faint">—</span>
+            <span v-if="b.groupName" class="grp" :title="b.groupName"><span class="swatch" :style="{ background: groupColor?.(b.groupId) ?? 'var(--faint)' }" /><span class="ellipsis">{{ b.groupName }}</span></span>
+            <span v-else class="muted">—</span>
           </td>
           <td class="c-tags" @click.stop>
             <div class="tags">
-              <button v-for="t in b.tags.slice(0, MAX_TAGS)" :key="t" type="button" class="tg" :title="`Filter by ${t}`" @click="emit('tag', t)">{{ t }}</button>
-              <span v-if="b.tags.length > MAX_TAGS" class="tg more" :title="b.tags.slice(MAX_TAGS).join(', ')">+{{ b.tags.length - MAX_TAGS }}</span>
-              <span v-if="!b.tags.length" class="faint">—</span>
+              <button v-for="t in tagsFit(b).shown" :key="t" type="button" class="tg" :title="`Filter by ${t}`" @click="emit('tag', t)">{{ t }}</button>
+              <span v-if="tagsFit(b).rest.length" class="tg-more" :title="tagsFit(b).rest.join(', ')">+{{ tagsFit(b).rest.length }}</span>
+              <span v-if="!b.tags.length" class="muted">—</span>
             </div>
           </td>
           <td class="c-plat">
-            <div v-if="b.accounts.length" class="plats"><AccountBadge v-for="a in b.accounts" :key="a.id" :account="a" /></div>
-            <span v-else class="faint small">No accounts</span>
+            <div v-if="b.accounts.length" class="plats">
+              <AccountBadge v-for="a in accShown(b)" :key="a.id" :account="a" />
+              <span v-if="accRest(b).length" class="acc-more num" :class="{ bad: accRest(b).some(a => a.loginState === 'expired') }" :title="accRest(b).map(accountTip).join('\n')">+{{ accRest(b).length }}</span>
+            </div>
+            <span v-else class="muted small nowrap">No accounts</span>
           </td>
           <td class="c-status"><BrandStatus :status="b.status" :error="b.statusError" /></td>
           <td class="c-last"><span class="small muted nowrap" :title="dateTime(b.lastOpenedAt)">{{ b.lastOpenedAt ? ago(b.lastOpenedAt) : 'Never' }}</span></td>
@@ -206,7 +236,7 @@ const MAX_TAGS = 2;
           </td>
           <td class="c-menu" @click.stop>
             <Menu :items="act.menu(b, menuExtra?.(b) ?? [])" :width="210">
-              <button type="button" class="more" :aria-label="`More for ${b.name}`"><Icon name="more" :size="18" :stroke="3" /></button>
+              <button type="button" class="more" :aria-label="`More for ${b.name}`" :title="`More for ${b.name}`"><Icon name="more" :size="18" :stroke="3" /></button>
             </Menu>
           </td>
         </tr>
@@ -218,14 +248,17 @@ const MAX_TAGS = 2;
 
 <style scoped>
 .bt-wrap { container-type: inline-size; width: 100%; min-width: 0; }
-.bt { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: auto; }
-th { position: sticky; top: var(--topbar); z-index: 2; background: var(--bg); padding: 10px 10px; border-bottom: 1px solid var(--fg); font-family: var(--mono); font-size: var(--fs-2xs); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; text-align: left; }
-th.sortable { cursor: pointer; } th.sortable:hover, th.on { color: var(--fg); }
+.bt { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+th { position: sticky; top: var(--topbar); z-index: 2; background: var(--bg); padding: 10px 10px; border-bottom: 1px solid var(--fg); font-family: var(--mono); font-size: var(--fs-2xs); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+th.sortable { cursor: pointer; transition: color 160ms; } th.sortable:hover, th.on { color: var(--fg); }
+th.sortable:focus-visible { outline: none; color: var(--fg); box-shadow: inset 0 -2px 0 var(--fg); }
 .th { display: inline-flex; align-items: center; gap: 4px; }
 .up { transform: rotate(180deg); }
-td { padding: 10px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; font-size: var(--fs-base); transition: background-color 180ms; }
+td { padding: 10px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; font-size: var(--fs-base); transition: background-color 180ms; overflow: hidden; }
 tr.br { cursor: pointer; outline: none; }
 tr.br:hover td, tr.br.sel td { background: var(--panel-hover); }
+/* chips and account plates are panel-2: on a highlighted row (≈ panel-2 in dark) step them up a shade */
+tr.br:hover, tr.br.sel, tr.br:focus-visible { --panel-2: var(--line); }
 tr.br.sel td { background: color-mix(in srgb, var(--panel-hover) 70%, var(--panel-2)); }
 tr.br:focus-visible td { background: var(--panel-hover); box-shadow: inset 0 -1px 0 var(--fg); }
 tr.br:focus-visible td:first-child { box-shadow: inset 3px 0 0 var(--fg), inset 0 -1px 0 var(--fg); }
@@ -235,38 +268,49 @@ tr.br:focus-visible td:first-child { box-shadow: inset 3px 0 0 var(--fg), inset 
 .drop-before td { box-shadow: inset 0 2px 0 var(--fg); }
 .drop-after td { box-shadow: inset 0 -2px 0 var(--fg); }
 
-.c-sel { width: 46px; padding-left: 4px; padding-right: 0; }
-td.c-sel { position: relative; }
+/* column widths (fixed layout); the brand column takes whatever is left */
+.c-sel { width: 44px; padding-left: 4px; padding-right: 0; }
+td.c-sel { position: relative; overflow: visible; }
 .cb { width: 15px; height: 15px; margin: 0 0 0 14px; accent-color: var(--fg); cursor: pointer; vertical-align: middle; }
-.grip { position: absolute; left: -6px; top: 50%; translate: 0 -50%; width: 18px; height: 28px; display: grid; place-items: center; color: var(--faint); cursor: grab; opacity: 0; transition: opacity 160ms; }
-tr.br:hover .grip { opacity: 1; }
+.grip { position: absolute; left: -6px; top: 50%; translate: 0 -50%; width: 18px; height: 28px; display: grid; place-items: center; color: var(--muted); cursor: grab; opacity: 0; transition: opacity 160ms; }
+tr.br:hover .grip, tr.br:focus-visible .grip { opacity: 1; }
 .grip:active { cursor: grabbing; }
-.c-serial { width: 58px; }
-.c-name { min-width: 180px; }
-.nm { display: flex; align-items: center; gap: 11px; min-width: 0; max-width: 340px; }
-.nm-line { min-width: 0; }
-.note-ic { color: var(--faint); flex: none; }
-.c-group { max-width: 160px; }
-.grp { display: inline-flex; align-items: center; gap: 7px; max-width: 150px; font-size: var(--fs-sm); color: var(--fg-2); }
-.tags { display: flex; gap: 4px; flex-wrap: nowrap; }
-.tg { height: 21px; padding: 0 8px; border-radius: var(--r-pill); background: var(--panel-2); color: var(--fg-2); font-size: var(--fs-xs); font-weight: 500; white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; transition: background-color 160ms; }
-button.tg:hover { background: var(--line); color: var(--fg); }
-.tg.more { display: inline-flex; align-items: center; background: none; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); cursor: default; }
-.plats { display: flex; gap: 5px; flex-wrap: wrap; max-width: 190px; }
-.c-act { width: 1%; text-align: right; padding-right: 2px; }
-.c-act :deep(.btn) { min-width: 78px; }
-.c-menu { width: 40px; padding-left: 2px; text-align: right; }
+.c-serial { width: 64px; }
+.c-group { width: 128px; }
+.c-tags { width: 168px; }
+.c-plat { width: 140px; }
+.c-status { width: 112px; }
+.c-last { width: 108px; }
+.c-act { width: 108px; text-align: right; padding-right: 2px; }
+.c-menu { width: 44px; padding-left: 2px; text-align: right; }
+td.c-act, td.c-menu { overflow: visible; }
+.c-act :deep(.btn) { min-width: 82px; }
+
+.nm { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.nm-line { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.note-ic { color: var(--muted); flex: none; }
+.grp { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; font-size: var(--fs-sm); color: var(--fg-2); vertical-align: middle; }
+[data-theme='dark'] .swatch { box-shadow: inset 0 0 0 1px rgb(243 239 228 / .3); }
+.tags { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.tg { flex: 0 1 auto; min-width: 0; height: 21px; padding: 0 8px; border-radius: var(--r-pill); background: var(--panel-2); color: var(--fg-2); font-size: var(--fs-xs); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background-color 160ms, color 160ms; }
+button.tg:hover { background: var(--line-strong); color: var(--fg); }
+.tg-more { flex: none; display: inline-flex; align-items: center; height: 21px; padding: 0 7px; border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); cursor: help; font-family: var(--mono); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plats { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
+.acc-more { flex: none; display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-family: var(--mono); font-size: var(--fs-2xs); cursor: help; }
+.acc-more.bad { color: var(--bad); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 40%, transparent); }
 .more { width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 50%; color: var(--muted); transition: background-color 160ms, color 160ms; }
-.more:hover { background: var(--panel-2); color: var(--fg); }
+.more:hover, .more:focus-visible { background: var(--panel-2); color: var(--fg); }
 .skel-row td { padding: 15px 10px; }
 .empty-slot { padding: var(--s5) 0; }
 
-/* the window narrows: least-needed columns go first */
+/* the container narrows: least-needed columns go first */
 .ser-inline { display: none; margin-top: 1px; }
 .si-g { display: none; }
-@container (max-width: 1060px) { .c-serial { display: none; } .ser-inline { display: block; } }
-@container (max-width: 960px) { .c-last { display: none; } }
-@container (max-width: 820px) { .c-group { display: none; } .si-g { display: inline; } }
-@container (max-width: 700px) { .c-tags { display: none; } }
-@container (max-width: 600px) { .c-status { display: none; } }
+/* each step keeps the brand column at 200px or more */
+@container (max-width: 1116px) { .c-serial { display: none; } .ser-inline { display: block; } }
+@container (max-width: 1052px) { .c-last { display: none; } }
+@container (max-width: 944px) { .c-group { display: none; } .si-g { display: inline; } }
+@container (max-width: 816px) { .c-tags { display: none; } }
+@container (max-width: 648px) { .c-status { display: none; } }
+@container (max-width: 536px) { .c-plat { display: none; } }
 </style>

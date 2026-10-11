@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // New brand wizard (PLAN 6.2): identity → platforms → browser → review → create → "Open and log in".
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import type { BrandRow, ChromeProfileInfo, Platform } from '@shared/types';
 import { PLATFORMS } from '@shared/types';
@@ -23,8 +23,8 @@ import AccountFields from '@/components/brands/AccountFields.vue';
 import { cleanHandle, draftToInput, newDraft, type AccountDraft } from '@/components/brands/draft';
 import { downloadCsvTemplate, pickCsvAndCreate } from '@/components/brands/importers';
 import { loginUrls, normalizeUrl, useBrandActions } from '@/components/brands/actions';
-import { handleText, TIER_LABEL } from '@/components/common/login';
-import { api } from '@/lib/api';
+import { handleText, serialText, TIER_LABEL } from '@/components/common/login';
+import { api, modKey } from '@/lib/api';
 import { app } from '@/lib/store';
 import { useLoad } from '@/composables/useLoad';
 import { fail } from '@/composables/toast';
@@ -41,7 +41,14 @@ const STEPS: { key: Step; label: string }[] = [
 const step = ref<Step>('identity');
 const idx = computed(() => STEPS.findIndex(s => s.key === step.value));
 const reached = ref(0);
-watch(idx, i => (reached.value = Math.max(reached.value, i)));
+watch(idx, i => {
+  reached.value = Math.max(reached.value, i);
+  // a new step starts at its top: if the stepper scrolled away (long platforms list), bring it back
+  void nextTick(() => {
+    const s = document.querySelector<HTMLElement>('.nb .stepper-wrap');
+    if (s && s.getBoundingClientRect().top < 64) s.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+});
 
 const PALETTE = ['#0b0b0a', '#2c4f9c', '#1d6b45', '#a3261d', '#8a5a00', '#6b3fa0', '#0f766e', '#be185d', '#475569', '#b45309'];
 const PRESETS = [{ value: '1280x900', label: '1280 × 900' }, { value: '1440x900', label: '1440 × 900' }, { value: '1920x1080', label: '1920 × 1080' }, { value: 'custom', label: 'Custom' }];
@@ -58,8 +65,18 @@ const form = reactive(fresh());
 watch(() => form.preset, p => { if (p !== 'custom') { const [w, h] = p.split('x').map(Number); form.width = w; form.height = h; } });
 
 const tags = useLoad(() => api('tags.list'));
+const groups = useLoad(() => api('groups.list'), { topics: ['brands.changed'] });
+const groupLabel = computed(() => (form.groupId ? groups.data.value?.find(g => g.id === form.groupId)?.name ?? '—' : 'No group'));
 const nameInput = ref<HTMLInputElement | null>(null);
-onMounted(() => setTimeout(() => nameInput.value?.focus(), 250));
+/** Focus the name field and make sure it is really in view (on a 620px-high window it starts under the sticky footer). */
+function focusName() {
+  const el = nameInput.value;
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  const r = el.getBoundingClientRect();
+  if (r.bottom > window.innerHeight - 96 || r.top < 64) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+onMounted(() => setTimeout(focusName, 250));
 
 // ── platforms ──
 const used = computed(() => new Set(form.accounts.map(a => a.platform)));
@@ -68,7 +85,7 @@ function removeAt(i: number) { form.accounts.splice(i, 1); }
 const QUICK = PLATFORMS.filter(p => p !== 'custom');
 
 // startup URLs follow the chosen platforms until edited by hand
-const homeUrls = computed(() => [...new Set(form.accounts.map(a => PLATFORM_SPECS[a.platform]?.home).filter(u => u && u !== 'about:blank'))]);
+const homeUrls = computed(() => [...new Set(form.accounts.map(a => (a.platform === 'custom' ? (cleanHandle('custom', a.handle) ? normalizeUrl(cleanHandle('custom', a.handle)) : '') : PLATFORM_SPECS[a.platform]?.home)).filter(u => u && u !== 'about:blank'))]);
 watch(homeUrls, u => { if (!form.urlsTouched) form.startupUrls = [...u]; }, { immediate: true });
 function setUrl(i: number, v: string) { form.urlsTouched = true; form.startupUrls[i] = v; }
 function addUrl() { form.urlsTouched = true; form.startupUrls.push(''); void nextTick(() => document.querySelector<HTMLInputElement>('.urls li:last-child input')?.focus()); }
@@ -132,19 +149,26 @@ async function openAndLogin() {
 function another() {
   Object.assign(form, fresh());
   created.value = null; step.value = 'identity'; reached.value = 0; tried.value = new Set();
-  setTimeout(() => nameInput.value?.focus(), 300);
+  setTimeout(focusName, 300);
 }
 async function csv() { const n = await pickCsvAndCreate(); if (n) void router.push('/'); }
 
+// Ctrl/⌘+Enter anywhere on the page (focus often lands on <body> after a step swaps its buttons),
+// but not while a dialog or dropdown has the keyboard
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (step.value === 'review') void create(); else next(); }
+  if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || created.value || creating.value) return;
+  if (document.querySelector('.modal-root, .ff-select-pop, .cp-root')) return;
+  e.preventDefault();
+  if (step.value === 'review') void create(); else next();
 }
+onMounted(() => window.addEventListener('keydown', onKey));
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.height); return { width: `${Math.round(form.width * s)}px`, height: `${Math.round(form.height * s)}px` }; });
 </script>
 
 <template>
-  <div class="page nb" @keydown="onKey">
-    <PageHeader eyebrow="New brand" :title="created ? 'Brand created' : form.name.trim() || 'New brand'" :back="{ to: '/', label: 'Brands' }">
+  <div class="page nb">
+    <PageHeader eyebrow="New brand" :title="created ? 'Brand created' : 'New brand'" :back="{ to: '/', label: 'Brands' }">
       <span v-if="!created">Its own sealed Chrome profile: logins, cookies and extensions stay inside this brand.</span>
       <template v-if="!created" #actions>
         <Btn size="sm" variant="subtle" icon="download" @click="downloadCsvTemplate">CSV template</Btn>
@@ -157,8 +181,8 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
       <div class="done-head">
         <BrandAvatar :brand="created" :size="64" />
         <div class="grow">
-          <div class="label">#{{ String(created.serial).padStart(3, '0') }}{{ groupName ? ` · ${groupName}` : '' }}</div>
-          <h2 class="h1">{{ created.name }}</h2>
+          <div class="label">{{ serialText(created.serial) }}{{ groupName ? ` · ${groupName}` : '' }}</div>
+          <h2 class="h1 bname">{{ created.name }}</h2>
           <p class="muted mt-2">Profile folder made. Next: open its Chrome and log in to each platform once — the logins stay in this brand from then on.</p>
         </div>
       </div>
@@ -170,7 +194,7 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
         <Btn size="lg" icon-right="arrow" :to="`/brands/${created.id}`">Go to brand</Btn>
         <Btn variant="subtle" icon="plus" @click="another">Create another</Btn>
       </div>
-      <p v-if="created.accounts.length" class="tiny muted">Opens {{ created.accounts.length === 1 ? 'the login page' : `${loginUrls(created).length} login pages` }} in {{ created.name }}’s window. Saved logins can be typed in for you from the Accounts tab (Fill login).</p>
+      <p v-if="created.accounts.length" class="tiny muted">Opens {{ loginUrls(created).length === 1 ? 'the login page' : `${loginUrls(created).length} login pages` }} in {{ created.name }}’s window. Saved logins can be typed in for you from the Accounts tab (Fill login).</p>
     </section>
 
     <template v-else>
@@ -201,7 +225,7 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
                 <button v-for="p in QUICK" :key="p" type="button" class="qp" :class="{ has: used.has(p) }" @click="addPlatform(p)">
                   <PlatformIcon :platform="p" :size="18" colored /><span>{{ PLATFORM_SPECS[p].name }}</span><Icon v-if="used.has(p)" name="check" :size="13" class="tick" />
                 </button>
-                <button type="button" class="qp" @click="addPlatform('custom')"><PlatformIcon platform="custom" :size="18" /><span>Other site</span></button>
+                <button type="button" class="qp" :class="{ has: used.has('custom') }" @click="addPlatform('custom')"><PlatformIcon platform="custom" :size="18" /><span>{{ PLATFORM_SPECS.custom.name }} site</span><Icon v-if="used.has('custom')" name="check" :size="13" class="tick" /></button>
               </div>
             </div>
             <TransitionGroup name="list" tag="div" class="col gap-4">
@@ -266,6 +290,7 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
               <div class="grow"><h2 class="h1">{{ form.name }}</h2><p v-if="form.notes" class="small muted mt-2">{{ form.notes }}</p></div>
             </div>
             <dl class="facts">
+              <dt>Group</dt><dd>{{ groupLabel }}</dd>
               <dt>Tags</dt><dd>{{ form.tags.length ? form.tags.join(', ') : '—' }}</dd>
               <dt>Platforms</dt>
               <dd>
@@ -286,7 +311,7 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
       <footer class="foot">
         <Btn v-if="idx > 0" variant="subtle" icon="arrow-left" @click="back">Back</Btn>
         <span class="grow" />
-        <span class="tiny faint keys">{{ step === 'review' ? 'Ctrl+Enter creates' : 'Ctrl+Enter for next' }}</span>
+        <span class="tiny muted keys nowrap">{{ step === 'review' ? `${modKey}+Enter creates` : `${modKey}+Enter for next` }}</span>
         <Btn v-if="step === 'platforms' && !form.accounts.length" variant="ghost" @click="next">Skip for now</Btn>
         <Btn v-if="step !== 'review'" variant="primary" icon-right="arrow" :disabled="step === 'platforms' && !form.accounts.length" @click="next">Next</Btn>
         <Btn v-else variant="signal" icon="check" :loading="creating" @click="create">Create brand</Btn>
@@ -295,8 +320,14 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
   </div>
 </template>
 
+<style>
+/* Tab / focus scrolling clears the sticky top bar and the sticky wizard footer */
+html:has(.page.nb) { scroll-padding: 72px 0 96px; }
+</style>
+
 <style scoped>
 .nb { max-width: 860px; margin: 0 auto; }
+.nb .h1 { overflow-wrap: anywhere; }
 .stepper-wrap { max-width: 560px; margin: 0 auto 28px; }
 .section-h { display: flex; flex-direction: column; gap: 4px; padding-bottom: 4px; }
 .input.big { font-size: var(--fs-lg); min-height: 48px; }
@@ -322,7 +353,7 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
 .pt { padding: 14px 0 0 50px; max-width: 480px; }
 .rv-acc { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .rv-a { display: inline-flex; align-items: center; gap: 7px; }
-.foot { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 10px; margin-top: 20px; padding: 14px 0 18px; background: linear-gradient(to top, var(--bg) 70%, transparent); }
+.foot { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 10px; margin-top: 20px; padding: 14px 0 18px; background: var(--bg); box-shadow: 0 -1px 0 var(--line-soft); }
 .done { padding: 32px; display: flex; flex-direction: column; gap: 22px; }
 .done-head { display: flex; gap: 20px; align-items: center; }
 .done-accts { display: flex; flex-direction: column; border-top: 1px solid var(--line-soft); }

@@ -8,7 +8,14 @@ const props = withDefaults(defineProps<{ modelValue: string; palette?: string[] 
 });
 const emit = defineEmits<{ 'update:modelValue': [v: string] }>();
 const valid = computed(() => /^#[0-9a-f]{6}$/i.test(props.modelValue));
-function hex(v: string) { const s = v.trim(); emit('update:modelValue', s.startsWith('#') ? s : `#${s}`); }
+/** Accept "#1d6b45", "1d6b45" or the short "#1d6"; anything else snaps back to the current colour. */
+function hex(e: Event) {
+  const el = e.target as HTMLInputElement;
+  let s = el.value.trim().replace(/^#/, '').toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(s)) s = s.split('').map(c => c + c).join('');
+  if (/^[0-9a-f]{6}$/.test(s)) emit('update:modelValue', `#${s}`);
+  else el.value = props.modelValue;
+}
 </script>
 
 <template>
@@ -20,7 +27,7 @@ function hex(v: string) { const s = v.trim(); emit('update:modelValue', s.starts
     </div>
     <label class="custom">
       <input type="color" :value="valid ? modelValue : '#000000'" aria-label="Custom colour" @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)" />
-      <input class="input hex code" :value="modelValue" maxlength="7" spellcheck="false" aria-label="Hex colour" @change="hex(($event.target as HTMLInputElement).value)" />
+      <input class="input hex code" :value="modelValue" maxlength="7" spellcheck="false" aria-label="Hex colour" title="Any colour as #rrggbb" @change="hex" @keydown.enter.prevent="hex" />
     </label>
   </div>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Brands home (PLAN 6.1): every brand with its group, tags, login health and window status;
 // search + filters, sort, drag to reorder, batch actions, window tools, CSV / .brand import.
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch, watchEffect } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { BrandRow } from '@shared/types';
 import { PLATFORMS } from '@shared/types';
@@ -13,7 +13,6 @@ import Menu from '@/components/ui/Menu.vue';
 import Modal from '@/components/ui/Modal.vue';
 import Field from '@/components/ui/Field.vue';
 import Select from '@/components/ui/Select.vue';
-import Segmented from '@/components/ui/Segmented.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import LoadError from '@/components/common/LoadError.vue';
 import BrandTable, { type SortKey } from '@/components/brands/BrandTable.vue';
@@ -52,9 +51,25 @@ const narrow = computed(() => width.value < 820);
 const overlay = ref(false);
 const showSide = computed(() => (narrow.value ? overlay.value : sideOpen.value));
 function toggleSide() { if (narrow.value) overlay.value = !overlay.value; else sideOpen.value = !sideOpen.value; }
+// the list column narrows: the three filter pills fold into one "Filters" popover so the toolbar stays one line
+const mainEl = ref<HTMLElement | null>(null);
+const mainW = ref(900);
+const compact = computed(() => mainW.value < 760);
+const filtersOpen = ref(false);
 let ro: ResizeObserver | null = null;
-const outside = (e: MouseEvent) => { if (!overlay.value) return; const t = e.target as HTMLElement; if (!t.closest('.side, .side-tg, .modal-root, .menu')) overlay.value = false; };
-onMounted(() => { ro = new ResizeObserver(([en]) => (width.value = en.contentRect.width)); if (root.value) ro.observe(root.value); document.addEventListener('mousedown', outside); });
+const outside = (e: MouseEvent) => {
+  const t = e.target as HTMLElement;
+  if (overlay.value && !t.closest('.side, .side-tg, .modal-root, .menu')) overlay.value = false;
+  if (filtersOpen.value && !t.closest('.fpop, .ftg, .ff-select-pop')) filtersOpen.value = false;
+};
+onMounted(() => {
+  ro = new ResizeObserver(ens => { for (const en of ens) { if (en.target === root.value) width.value = en.contentRect.width; else mainW.value = en.contentRect.width; } });
+  if (root.value) ro.observe(root.value);
+  if (mainEl.value) ro.observe(mainEl.value);
+  document.addEventListener('mousedown', outside);
+});
+watch(mainEl, (el, old) => { if (old) ro?.unobserve(old); if (el) ro?.observe(el); }, { flush: 'post' });
+watch(compact, c => { if (!c) filtersOpen.value = false; });
 onBeforeUnmount(() => { ro?.disconnect(); document.removeEventListener('mousedown', outside); });
 
 // ── filter + search ──
@@ -73,7 +88,13 @@ const all = useLoad(() => api('brands.list', {}), { topics: TOPICS });
 const filtered = useLoad(() => (active.value ? api('brands.list', { filter: { ...clean.value, q: qLive.value || undefined } as NonNullable<In<'brands.list'>>['filter'] }) : Promise.resolve(null)), {
   topics: TOPICS, deps: [() => JSON.stringify(clean.value), qLive]
 });
-const rows = computed<BrandRow[] | null>(() => (active.value ? filtered.data.value : all.data.value));
+// while the first filtered result is on its way, keep showing the rows already on screen
+// (no flash back to the skeleton on the first keystroke)
+const rows = shallowRef<BrandRow[] | null>(null);
+watchEffect(() => {
+  const next = active.value ? filtered.data.value : all.data.value;
+  if (next !== null || !active.value) rows.value = next;
+});
 const loading = computed(() => all.loading.value || (active.value && filtered.loading.value && !filtered.data.value));
 const groups = useLoad(() => api('groups.list'), { topics: ['brands.changed'] });
 const tags = useLoad(() => api('tags.list'), { topics: ['brands.changed'] });
@@ -109,8 +130,8 @@ async function batch(action: 'open' | 'close' | 'health', label: string) {
   batchBusy.value = action;
   try {
     const r = await api('brands.batch', { ids, action });
-    if (r.errors.length) toast(`${label}: ${r.ok} done, ${r.errors.length} failed`, { tone: 'warn', body: r.errors.slice(0, 3).join(' · ') });
-    else ok(`${label}: ${r.ok} brand${r.ok === 1 ? '' : 's'}`);
+    if (r.errors.length) toast(`${label} ${r.ok} of ${ids.length} — ${r.errors.length} failed`, { tone: 'warn', body: r.errors.slice(0, 3).join(' · ') });
+    else ok(`${label} ${r.ok} brand${r.ok === 1 ? '' : 's'}`);
   } catch (e) { fail(e, `${label} failed`); } finally { batchBusy.value = null; }
 }
 async function batchDelete() { if (await act.remove(selRows.value)) selected.value = new Set(); }
@@ -153,9 +174,10 @@ async function arrange(mode: 'tile' | 'cascade') {
   try { await api('brands.arrange', { mode, ids: ids.length ? ids : undefined }); } catch (e) { fail(e, mode === 'tile' ? 'Could not tile windows' : 'Could not cascade windows'); } finally { arranging.value = null; }
 }
 async function closeAll() {
-  if (!(await confirm({ title: `Close all ${openIds.value.length} open brand windows?`, body: 'Logins and tabs are kept — Chrome restores them next time each brand opens.', confirm: 'Close all' }))) return;
+  const n = openIds.value.length;
+  if (!(await confirm({ title: n === 1 ? 'Close the open brand window?' : `Close all ${n} open brand windows?`, body: n === 1 ? 'Logins and tabs are kept — Chrome restores them next time the brand opens.' : 'Logins and tabs are kept — Chrome restores them next time each brand opens.', confirm: n === 1 ? 'Close it' : 'Close all' }))) return;
   arranging.value = 'close';
-  try { await api('brands.closeAll'); ok('All brand windows closed'); } catch (e) { fail(e); } finally { arranging.value = null; }
+  try { await api('brands.closeAll'); ok(n === 1 ? 'Brand window closed' : 'All brand windows closed'); } catch (e) { fail(e); } finally { arranging.value = null; }
 }
 
 // ── reorder (only when the list is in its own order) ──
@@ -186,6 +208,9 @@ const loginOpts = [{ value: null, label: 'Any login' }, { value: 'ok', label: LO
 const statusOpts = [{ value: null, label: 'Any status' }, { value: 'open', label: 'Open' }, { value: 'opening', label: 'Opening' }, { value: 'closed', label: 'Closed' }, { value: 'error', label: 'Error' }];
 const groupName = computed(() => (filter.groupId === 'none' ? 'No group' : groups.data.value?.find(g => g.id === filter.groupId)?.name ?? 'Group'));
 const setF = (k: keyof BrandFilter, v: string | null) => { if (v) filter[k] = v; else delete filter[k]; };
+/** how many of the three toolbar filters are set (shown on the folded "Filters" button) */
+const pillCount = computed(() => [filter.platform, filter.loginState, filter.status].filter(Boolean).length);
+const VIEWS = [{ value: 'table', icon: 'rows', label: 'Table view' }, { value: 'cards', icon: 'grid', label: 'Card view' }] as const;
 
 function goDetail(b: BrandRow) { void router.push(`/brands/${b.id}`); }
 
@@ -193,8 +218,10 @@ function goDetail(b: BrandRow) { void router.push(`/brands/${b.id}`); }
 const search = ref<HTMLInputElement | null>(null);
 function onKey(e: KeyboardEvent) {
   const t = e.target as HTMLElement | null;
-  const typing = !!t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
+  // a focused checkbox (just used to select rows) is not "typing": Esc should still clear the selection
+  const typing = !!t && (t.isContentEditable || ['TEXTAREA', 'SELECT'].includes(t.tagName) || (t.tagName === 'INPUT' && !['checkbox', 'radio', 'button'].includes((t as HTMLInputElement).type)));
   if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); e.stopImmediatePropagation(); search.value?.focus(); search.value?.select(); }
+  else if (e.key === 'Escape' && filtersOpen.value && !document.querySelector('.ff-select-pop')) { filtersOpen.value = false; }
   else if (e.key === 'Escape' && overlay.value) { overlay.value = false; }
   else if (e.key === 'Escape' && !typing && selected.value.size && !document.querySelector('.modal-root, .drawer-root, .menu, .ff-select-pop, .ff-picker-pop')) selected.value = new Set();
 }
@@ -242,26 +269,43 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
         <BrandSidebar :filter="clean" :groups="groups.data.value" :tags="tags.data.value" :total="counts.total" :relogin="counts.relogin" :open="counts.open" :ungrouped="counts.ungrouped" @set="setFilter" />
       </aside></Transition>
 
-      <section class="main">
+      <section ref="mainEl" class="main">
         <div class="toolbar">
-          <button type="button" class="side-tg" :aria-pressed="showSide" :title="showSide ? 'Hide groups and tags' : 'Show groups and tags'" @click="toggleSide"><Icon name="sidebar" :size="16" /></button>
-          <label class="search">
+          <button type="button" class="side-tg" :aria-pressed="showSide" :aria-label="showSide ? 'Hide groups and tags' : 'Show groups and tags'" :title="showSide ? 'Hide groups and tags' : 'Show groups and tags'" @click="toggleSide"><Icon name="sidebar" :size="16" /></button>
+          <label class="search" title="Search by name, handle, tag, #serial or notes">
             <Icon name="search" :size="15" />
-            <input ref="search" v-model="q" placeholder="Search name, handle, tag, #serial, notes" aria-label="Search brands" spellcheck="false" @keydown.esc="q = ''; ($event.target as HTMLInputElement).blur()" />
-            <button v-if="q" type="button" class="clr" aria-label="Clear search" @click="q = ''"><Icon name="close" :size="12" /></button>
-            <kbd v-else class="keys">/</kbd>
+            <input ref="search" v-model="q" placeholder="Search brands…" aria-label="Search brands by name, handle, tag, serial or notes" spellcheck="false" @keydown.esc="q = ''; ($event.target as HTMLInputElement).blur()" />
+            <button v-if="q" type="button" class="clr" aria-label="Clear search" title="Clear search" @click="q = ''"><Icon name="close" :size="12" /></button>
+            <kbd v-else class="keys" title="Press / to search">/</kbd>
           </label>
-          <Select :model-value="filter.platform ?? null" :options="platformOpts" variant="pill" aria-label="Platform" :min-width="180" @update:model-value="v => setF('platform', v)" />
-          <Select :model-value="filter.loginState ?? null" :options="loginOpts" variant="pill" aria-label="Login state" :min-width="170" @update:model-value="v => setF('loginState', v)" />
-          <Select :model-value="filter.status ?? null" :options="statusOpts" variant="pill" aria-label="Status" :min-width="150" @update:model-value="v => setF('status', v)" />
+          <template v-if="!compact">
+            <Select :model-value="filter.platform ?? null" :options="platformOpts" variant="pill" aria-label="Platform" :min-width="180" @update:model-value="v => setF('platform', v)" />
+            <Select :model-value="filter.loginState ?? null" :options="loginOpts" variant="pill" aria-label="Login state" :min-width="170" @update:model-value="v => setF('loginState', v)" />
+            <Select :model-value="filter.status ?? null" :options="statusOpts" variant="pill" aria-label="Status" :min-width="150" @update:model-value="v => setF('status', v)" />
+          </template>
+          <div v-else class="fwrap">
+            <button type="button" class="ftg" :class="{ on: filtersOpen || pillCount }" :aria-expanded="filtersOpen" aria-haspopup="dialog" @click="filtersOpen = !filtersOpen">
+              <Icon name="filter" :size="15" /><span>Filters</span><span v-if="pillCount" class="fcount num">{{ pillCount }}</span>
+            </button>
+            <Transition name="pop">
+              <div v-if="filtersOpen" class="fpop" role="dialog" aria-label="Filters" @keydown.esc.stop="filtersOpen = false">
+                <Select :model-value="filter.platform ?? null" :options="platformOpts" aria-label="Platform" @update:model-value="v => setF('platform', v)" />
+                <Select :model-value="filter.loginState ?? null" :options="loginOpts" aria-label="Login state" @update:model-value="v => setF('loginState', v)" />
+                <Select :model-value="filter.status ?? null" :options="statusOpts" aria-label="Status" @update:model-value="v => setF('status', v)" />
+                <button v-if="pillCount" type="button" class="link small freset" @click="setF('platform', null); setF('loginState', null); setF('status', null)">Reset these filters</button>
+              </div>
+            </Transition>
+          </div>
           <div class="grow" />
-          <Segmented v-model="view" size="sm" :options="[{ value: 'table', icon: 'rows', label: '' }, { value: 'cards', icon: 'grid', label: '' }]" aria-label="View" />
+          <div class="vt" role="group" aria-label="View">
+            <button v-for="o in VIEWS" :key="o.value" type="button" :aria-pressed="view === o.value" :aria-label="o.label" :title="o.label" @click="view = o.value"><Icon :name="o.icon" :size="15" /></button>
+          </div>
         </div>
 
         <TransitionGroup tag="div" name="list" class="chips">
           <button v-if="filter.groupId" key="g" type="button" class="fchip" @click="setF('groupId', null)"><span class="label">Group</span>{{ groupName }}<Icon name="close" :size="11" /></button>
           <button v-if="filter.tag" key="t" type="button" class="fchip" @click="setF('tag', null)"><span class="label">Tag</span>{{ filter.tag }}<Icon name="close" :size="11" /></button>
-          <span key="n" class="small muted">{{ !active ? `${counts.total ?? 0} brand${counts.total === 1 ? '' : 's'}${selected.size ? ` · ${selected.size} selected` : ''}` : rows ? `${rows.length} of ${counts.total ?? 0}` : 'Filtering…' }}</span>
+          <span key="n" class="small muted num">{{ !active ? `${counts.total ?? 0} brand${counts.total === 1 ? '' : 's'}` : filtered.data.value ? `${filtered.data.value.length} of ${counts.total ?? 0}` : 'Filtering…' }}{{ selected.size ? ` · ${selected.size} selected` : '' }}</span>
           <button v-if="active" key="c" type="button" class="link small" @click="clearAll">Clear all</button>
         </TransitionGroup>
 
@@ -278,7 +322,7 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
             <EmptyState compact icon="search" title="No brands match" body="No brand fits this search and these filters."><Btn size="sm" @click="clearAll">Clear filters</Btn></EmptyState>
           </template>
         </BrandCards>
-        <p v-if="rows?.length && view === 'table'" class="tiny faint hint">
+        <p v-if="rows?.length && view === 'table'" class="tiny muted hint">
           <span class="keys">Enter opens a brand’s window · Shift+Enter shows its page · Space selects{{ reorderable ? ' · drag the grip to reorder' : ' · clear the sort to drag-reorder' }}</span>
         </p>
       </section>
@@ -336,6 +380,16 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
 .clr { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); }
 .clr:hover { background: var(--panel-2); color: var(--fg); }
 .toolbar :deep(.ff-select.v-pill .pill) { height: 40px; }
+.fwrap { position: relative; flex: none; }
+.ftg { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 13px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--fg-2); font-weight: 500; white-space: nowrap; transition: border-color 160ms, color 160ms; }
+.ftg:hover, .ftg.on { border-color: var(--line-strong); color: var(--fg); }
+.fcount { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--fg); color: var(--bg); font-family: var(--mono); font-size: var(--fs-2xs); }
+.fpop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 240px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-2); }
+.freset { align-self: flex-start; margin: 2px 2px 0; }
+.vt { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: var(--r-pill); background: var(--panel-2); border: 1px solid var(--line-soft); flex: none; }
+.vt button { width: 34px; height: 30px; display: grid; place-items: center; border-radius: var(--r-pill); color: var(--muted); transition: background-color 200ms var(--ease-out), color 200ms; }
+.vt button:hover { color: var(--fg); }
+.vt button[aria-pressed='true'] { background: var(--fg); color: var(--bg); }
 .chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -2px 0 12px; min-height: 26px; }
 .fchip { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px 0 10px; border-radius: var(--r-pill); background: var(--fg); color: var(--bg); font-size: var(--fs-sm); font-weight: 500; }
 .fchip .label { color: color-mix(in srgb, var(--bg) 60%, transparent); }
@@ -344,7 +398,8 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
 
 /* batch bar: Ink, floating over the list, Lime only on the count */
 .batch { position: fixed; left: var(--sidebar); right: 0; margin-inline: auto; width: max-content; bottom: 22px; z-index: 400; display: flex; align-items: center; gap: 2px; max-width: calc(100vw - var(--sidebar) - 40px); padding: 6px 6px 6px 16px; border-radius: 14px; background: var(--ink); color: var(--bone); box-shadow: var(--shadow-3); flex-wrap: wrap; }
-:global(.rail) .batch { left: var(--sidebar-rail); max-width: calc(100vw - var(--sidebar-rail) - 40px); }
+/* ancestor class from the layout: no :global() — `:global(.rail) .batch` compiles to a bare `.rail { … }` */
+.rail .batch { left: var(--sidebar-rail); max-width: calc(100vw - var(--sidebar-rail) - 40px); }
 [data-theme='dark'] .batch { background: #1c1c1a; border: 1px solid #2a2a27; }
 .batch .cnt { font-size: var(--fs-sm); font-weight: 500; margin-right: 6px; white-space: nowrap; }
 .batch .cnt .num { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--lime); color: var(--ink); font-family: var(--mono); font-size: var(--fs-2xs); margin-right: 4px; }
@@ -367,8 +422,6 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
 .ov-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 8px 10px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
 .ov-x { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); }
 .ov-x:hover { background: var(--panel-2); color: var(--fg); }
-.narrow {
-  .side { position: fixed; top: calc(var(--topbar) + 8px); bottom: 12px; left: calc(var(--sidebar) + 12px); width: 230px; max-height: none; z-index: 350; padding: 14px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-3); }
-  :global(.rail) .side { left: calc(var(--sidebar-rail) + 12px); }
-}
+.narrow .side { position: fixed; top: calc(var(--topbar) + 8px); bottom: 12px; left: calc(var(--sidebar) + 12px); width: 230px; max-height: none; z-index: 350; padding: 14px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-3); }
+.rail .narrow .side { left: calc(var(--sidebar-rail) + 12px); }
 </style>

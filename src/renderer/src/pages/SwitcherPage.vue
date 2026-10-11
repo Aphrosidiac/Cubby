@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon.vue';
 import BrandAvatar from '@/components/common/BrandAvatar.vue';
 import AccountBadge from '@/components/common/AccountBadge.vue';
 import { rankBrands } from '@/components/common/fuzzy';
-import { serialText, STATUS_LABEL } from '@/components/common/login';
+import { accountTip, serialText, STATUS_LABEL } from '@/components/common/login';
 import { api, on } from '@/lib/api';
 import { useLoad } from '@/composables/useLoad';
 
@@ -29,6 +29,7 @@ watch(q, () => { active.value = 0; err.value = null; });
 watch(active, () => void nextTick(() => listEl.value?.querySelector('.it.act')?.scrollIntoView({ block: 'nearest' })));
 
 const close = () => window.cubby?.closeSwitcher?.();
+function newBrand() { api('app.showInMain', { path: '/brands/new' }).then(close).catch(x => (err.value = (x as Error).message)); }
 async function go(b: BrandRow | undefined) {
   if (!b || busy.value) return;
   busy.value = b.id;
@@ -48,13 +49,18 @@ function key(e: KeyboardEvent) {
   else if (e.key === 'Escape') { e.preventDefault(); if (q.value) q.value = ''; else close(); }
   else if (e.key === 'Tab') e.preventDefault();
 }
+const refocus = () => input.value?.focus();
 onMounted(() => {
   // the window itself is transparent: only the rounded panel paints
   document.documentElement.classList.add('switcher-win');
-  setTimeout(() => input.value?.focus(), 30);
-  window.addEventListener('focus', () => input.value?.focus());
+  setTimeout(refocus, 30);
+  window.addEventListener('focus', refocus);
 });
-onBeforeUnmount(off);
+onBeforeUnmount(() => {
+  off();
+  window.removeEventListener('focus', refocus);
+  document.documentElement.classList.remove('switcher-win');
+});
 </script>
 
 <template>
@@ -70,13 +76,21 @@ onBeforeUnmount(off);
           <li v-for="i in 4" :key="i" class="it"><div class="skel" style="width: 32px; height: 32px; border-radius: 8px" /><div class="skel-line" :style="{ width: `${100 + i * 30}px` }" /></li>
         </template>
         <li v-else-if="brands.error.value" class="none">Could not load brands — {{ brands.error.value }}</li>
-        <li v-else-if="!brands.data.value?.length" class="none">No brands yet. Create one in Cubby.</li>
+        <li v-else-if="!brands.data.value?.length" class="none">
+          <span>No brands yet.</span>
+          <button type="button" class="link" @mousedown.prevent="newBrand">Create one in Cubby</button>
+        </li>
         <li v-else-if="!shown.length" class="none">No brand matches “{{ q }}”.</li>
         <li v-for="(b, i) in shown" :key="b.id" class="it" :class="{ act: i === active }" role="option" :aria-selected="i === active" @mouseenter="active = i" @mousedown.prevent="go(b)">
           <BrandAvatar :brand="b" :size="32" />
           <div class="grow">
-            <div class="nm"><span class="ellipsis">{{ b.name }}</span><span class="code faint">{{ serialText(b.serial) }}</span></div>
-            <div class="ac"><AccountBadge v-for="a in b.accounts.slice(0, 6)" :key="a.id" :account="a" :size="13" /><span v-if="b.groupName" class="tiny muted">{{ b.groupName }}</span></div>
+            <div class="nm"><span class="ellipsis" :title="b.name">{{ b.name }}</span><span class="code muted ser">{{ serialText(b.serial) }}</span></div>
+            <div class="ac">
+              <AccountBadge v-for="a in b.accounts.slice(0, 6)" :key="a.id" :account="a" :size="13" />
+              <span v-if="b.accounts.length > 6" class="more-n num" :title="b.accounts.slice(6).map(accountTip).join('\n')">+{{ b.accounts.length - 6 }}</span>
+              <span v-if="b.groupName" class="tiny muted ellipsis" :class="{ gap: b.accounts.length }">{{ b.groupName }}</span>
+              <span v-else-if="!b.accounts.length" class="tiny muted">No accounts</span>
+            </div>
           </div>
           <span class="st" :class="`s-${b.status}`"><span v-if="busy === b.id" class="spin" /><span v-else class="d" />{{ busy === b.id ? 'Opening…' : STATUS_LABEL[b.status] }}</span>
           <span class="go">{{ b.status === 'open' ? 'Front' : 'Open' }} <kbd>↵</kbd></span>
@@ -105,9 +119,11 @@ html.switcher-win, html.switcher-win body { background: transparent !important; 
 .it { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; cursor: pointer; min-height: 54px; }
 .it.act { background: var(--panel-2); }
 .nm { display: flex; align-items: baseline; gap: 8px; font-weight: 600; min-width: 0; }
-.ac { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.ser { flex: none; font-weight: 400; }
+.ac { display: flex; align-items: center; gap: 4px; margin-top: 3px; min-width: 0; min-height: 20px; }
 .ac :deep(.ab) { width: 20px; height: 20px; border-radius: 5px; }
-.ac .tiny { margin-left: 4px; }
+.ac .gap { margin-left: 4px; }
+.more-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 3px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--line); font-family: var(--mono); font-size: var(--fs-2xs); color: var(--muted); }
 .st { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
 .st .d { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
 .s-open { color: var(--good); } .s-open .d { background: var(--good); }
@@ -117,7 +133,8 @@ html.switcher-win, html.switcher-win body { background: transparent !important; 
 .go { display: none; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--fg-2); white-space: nowrap; }
 .it.act .go { display: inline-flex; }
 .it.act .st { display: none; }
-.none { padding: 28px 16px; text-align: center; color: var(--muted); font-size: var(--fs-sm); }
+.none { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; padding: 28px 16px; text-align: center; color: var(--muted); font-size: var(--fs-sm); }
+.none .link { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
 .ft { display: flex; align-items: center; gap: 16px; height: 38px; padding: 0 16px; border-top: 1px solid var(--line-soft); font-size: var(--fs-xs); color: var(--muted); flex: none; }
 .ft span { display: inline-flex; align-items: center; gap: 4px; }
 .ft .bad { color: var(--bad); display: block; }

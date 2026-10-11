@@ -100,14 +100,14 @@ const showAllTags = ref(false);
       <div v-if="groups === null" class="skel-line" style="width: 70%; margin: 10px 10px" />
       <div v-for="(g, i) in groups ?? []" :key="g.id" class="it-row" :class="{ on: filter.groupId === g.id }">
         <button type="button" class="it" :class="{ on: filter.groupId === g.id }" @click="only(filter.groupId === g.id ? {} : { groupId: g.id })">
-          <span class="swatch" :style="{ background: g.color }" /><span class="grow ellipsis">{{ g.name }}</span><span class="n num">{{ g.count || '' }}</span>
+          <span class="swatch" :style="{ background: g.color }" /><span class="grow ellipsis" :title="g.name">{{ g.name }}</span><span class="n num">{{ g.count }}</span>
         </button>
         <Menu :items="groupMenu(g, i)" :width="200">
           <button type="button" class="dots" :aria-label="`Edit group ${g.name}`"><Icon name="more" :size="16" :stroke="3" /></button>
         </Menu>
       </div>
       <button v-if="groups?.length && ungrouped" type="button" class="it" :class="{ on: filter.groupId === 'none' }" @click="only(filter.groupId === 'none' ? {} : { groupId: 'none' })">
-        <span class="swatch empty" /><span class="grow faint">No group</span><span class="n num">{{ ungrouped }}</span>
+        <span class="swatch empty" /><span class="grow nog">No group</span><span class="n num">{{ ungrouped }}</span>
       </button>
       <form v-if="adding" class="new" @submit.prevent="add">
         <input ref="newInput" v-model="newName" class="input" placeholder="Group name" maxlength="60" @keydown.esc.stop="adding = false" @blur="add" />
@@ -120,7 +120,7 @@ const showAllTags = ref(false);
       <div class="sec">
         <div v-for="t in showAllTags ? tags : tags.slice(0, 10)" :key="t.id" class="it-row" :class="{ on: filter.tag === t.name }">
           <button type="button" class="it" :class="{ on: filter.tag === t.name }" @click="only(filter.tag === t.name ? {} : { tag: t.name })">
-            <Icon name="hash" :size="14" /><span class="grow ellipsis">{{ t.name }}</span><span class="n num">{{ t.count || '' }}</span>
+            <Icon name="hash" :size="14" /><span class="grow ellipsis" :title="t.name">{{ t.name }}</span><span class="n num">{{ t.count }}</span>
           </button>
           <Menu :items="tagMenu(t)" :width="180">
             <button type="button" class="dots" :aria-label="`Edit tag ${t.name}`"><Icon name="more" :size="16" :stroke="3" /></button>
@@ -153,25 +153,35 @@ const showAllTags = ref(false);
 .head { display: flex; align-items: center; justify-content: space-between; margin: 18px 0 4px; padding: 0 4px 0 10px; height: 22px; }
 .add { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; color: var(--muted); }
 .add:hover { background: var(--panel-2); color: var(--fg); }
-.it { width: 100%; display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px 0 10px; border-radius: 7px; color: var(--fg-2); text-align: left; font-weight: 500; transition: background-color 160ms, color 160ms; min-width: 0; }
-.it .icon { color: var(--muted); }
+/* Every row keeps a 28px lane on the right for its ⋯ (groups and tags) so counts line up in one
+   column; the ⋯ sits beside the row's button, never on top of it. */
+.it { width: 100%; display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 36px 0 10px; border-radius: 7px; color: var(--fg-2); text-align: left; font-weight: 500; transition: background-color 160ms, color 160ms; min-width: 0; }
+.it .icon { color: var(--muted); flex: none; }
 .it:hover { background: var(--panel-2); color: var(--fg); }
 .it.on { background: var(--fg); color: var(--bg); }
-.it.on .icon, .it.on .n { color: color-mix(in srgb, var(--bg) 70%, transparent); }
+.it.on .icon, .it.on .n { color: color-mix(in srgb, var(--bg) 72%, transparent); }
 .it.ghost { color: var(--muted); font-weight: 400; }
-.it-row { position: relative; display: flex; align-items: center; }
-.it-row .it { padding-right: 34px; }
-.it-row :deep(.menu-root) { position: absolute; right: 3px; top: 3px; }
+.nog { color: var(--muted); }
+.it.on .nog { color: inherit; }
+.it-row { position: relative; display: flex; align-items: center; border-radius: 7px; transition: background-color 160ms, color 160ms; }
+.it-row .it { flex: 1; padding-right: 8px; background: none; color: var(--fg-2); }
+.it-row:hover { background: var(--panel-2); }
+.it-row:hover .it { color: var(--fg); }
+.it-row.on { background: var(--fg); }
+.it-row.on .it { color: var(--bg); }
+.it-row :deep(.menu-root) { flex: none; width: 28px; display: grid; place-items: center; }
 .dots { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: var(--muted); opacity: 0; transition: opacity 140ms, background-color 140ms; }
-.it-row:hover .dots, .dots:focus-visible, .it-row :deep(.menu-root:has(.menu)) .dots { opacity: 1; }
-.it-row:hover .n { opacity: 0; }
-.it-row.on .dots { color: var(--bg); }
-.dots:hover { background: color-mix(in srgb, var(--muted) 18%, transparent); }
-.n { font-family: var(--mono); font-size: var(--fs-2xs); color: var(--muted); min-width: 16px; text-align: right; transition: opacity 140ms; }
+.it-row:hover .dots, .it-row:focus-within .dots, .it-row :deep(.menu-root:has(.menu)) .dots { opacity: 1; }
+.it-row.on .dots { color: color-mix(in srgb, var(--bg) 80%, transparent); }
+.dots:hover, .dots:focus-visible { background: color-mix(in srgb, var(--muted) 20%, transparent); color: var(--fg); }
+.it-row.on .dots:hover, .it-row.on .dots:focus-visible { color: var(--bg); background: color-mix(in srgb, var(--bg) 18%, transparent); }
+.n { flex: none; font-family: var(--mono); font-size: var(--fs-2xs); color: var(--muted); min-width: 16px; text-align: right; font-variant-numeric: tabular-nums; }
 .n.bad { color: var(--bad); font-weight: 500; }
 .n.live { color: var(--good); font-weight: 500; }
 .it.on .n.bad, .it.on .n.live { color: var(--bg); }
-.swatch.empty { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.swatch.empty { background: transparent; box-shadow: none; border: 1.5px dashed var(--muted); }
+[data-theme='dark'] .swatch:not(.empty) { box-shadow: inset 0 0 0 1px rgb(243 239 228 / .3); }
+.foot .it { padding-right: 10px; }
 .new { padding: 3px 0; }
 .new .input { min-height: 32px; padding: 5px 10px; font-size: var(--fs-sm); }
 .foot { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--line-soft); }

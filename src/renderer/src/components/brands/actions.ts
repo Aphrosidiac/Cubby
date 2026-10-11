@@ -21,8 +21,9 @@ export function normalizeUrl(u: string): string {
   return /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : `https://${s}`;
 }
 
+/** Login pages for a brand's accounts; a custom-site account's own address stands in for its login page. */
 export const loginUrls = (b: Pick<BrandRow, 'accounts'>) =>
-  [...new Set((b.accounts ?? []).map(a => PLATFORM_SPECS[a.platform]?.loginUrl).filter((u): u is string => !!u && u !== 'about:blank'))];
+  [...new Set((b.accounts ?? []).map(a => (a.platform === 'custom' ? (a.handle ? normalizeUrl(a.handle) : null) : PLATFORM_SPECS[a.platform]?.loginUrl)).filter((u): u is string => !!u && u !== 'about:blank'))];
 
 export function useBrandActions() {
   const router = useRouter();
