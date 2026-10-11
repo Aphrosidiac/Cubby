@@ -60,8 +60,8 @@ async function move(g: Group, dir: -1 | 1) {
 }
 const groupMenu = (g: Group, i: number) => [
   { label: 'Rename / colour…', icon: 'edit', run: () => (editing.value = { id: g.id, name: g.name, color: g.color }) },
-  { label: 'Move up', icon: 'arrow-up-right', disabled: i === 0, run: () => void move(g, -1) },
-  { label: 'Move down', icon: 'chevron-down', disabled: i === (props.groups?.length ?? 0) - 1, run: () => void move(g, 1) },
+  { label: 'Move up', icon: 'arrow-up', disabled: i === 0, run: () => void move(g, -1) },
+  { label: 'Move down', icon: 'arrow-down', disabled: i === (props.groups?.length ?? 0) - 1, run: () => void move(g, 1) },
   { divider: true, label: '' },
   { label: 'Delete group', icon: 'trash', danger: true, run: () => void delGroup(g) }
 ];
@@ -102,8 +102,8 @@ const showAllTags = ref(false);
         <button type="button" class="it" :class="{ on: filter.groupId === g.id }" @click="only(filter.groupId === g.id ? {} : { groupId: g.id })">
           <span class="swatch" :style="{ background: g.color }" /><span class="grow ellipsis" :title="g.name">{{ g.name }}</span><span class="n num">{{ g.count }}</span>
         </button>
-        <Menu :items="groupMenu(g, i)" :width="200">
-          <button type="button" class="dots" :aria-label="`Edit group ${g.name}`"><Icon name="more" :size="16" :stroke="3" /></button>
+        <Menu v-slot="{ open }" :items="groupMenu(g, i)" :width="200">
+          <button type="button" class="dots" :class="{ on: open }" :aria-label="`Edit group ${g.name}`"><Icon name="more" :size="16" :stroke="3" /></button>
         </Menu>
       </div>
       <button v-if="groups?.length && ungrouped" type="button" class="it" :class="{ on: filter.groupId === 'none' }" @click="only(filter.groupId === 'none' ? {} : { groupId: 'none' })">
@@ -122,8 +122,8 @@ const showAllTags = ref(false);
           <button type="button" class="it" :class="{ on: filter.tag === t.name }" @click="only(filter.tag === t.name ? {} : { tag: t.name })">
             <Icon name="hash" :size="14" /><span class="grow ellipsis" :title="t.name">{{ t.name }}</span><span class="n num">{{ t.count }}</span>
           </button>
-          <Menu :items="tagMenu(t)" :width="180">
-            <button type="button" class="dots" :aria-label="`Edit tag ${t.name}`"><Icon name="more" :size="16" :stroke="3" /></button>
+          <Menu v-slot="{ open }" :items="tagMenu(t)" :width="180">
+            <button type="button" class="dots" :class="{ on: open }" :aria-label="`Edit tag ${t.name}`"><Icon name="more" :size="16" :stroke="3" /></button>
           </Menu>
         </div>
         <button v-if="tags.length > 10" type="button" class="it ghost" @click="showAllTags = !showAllTags"><span>{{ showAllTags ? 'Show fewer' : `Show all ${tags.length}` }}</span></button>
@@ -171,7 +171,7 @@ const showAllTags = ref(false);
 .it-row.on .it { color: var(--bg); }
 .it-row :deep(.menu-root) { flex: none; width: 28px; display: grid; place-items: center; }
 .dots { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: var(--muted); opacity: 0; transition: opacity 140ms, background-color 140ms; }
-.it-row:hover .dots, .it-row:focus-within .dots, .it-row :deep(.menu-root:has(.menu)) .dots { opacity: 1; }
+.it-row:hover .dots, .it-row:focus-within .dots, .dots.on { opacity: 1; }
 .it-row.on .dots { color: color-mix(in srgb, var(--bg) 80%, transparent); }
 .dots:hover, .dots:focus-visible { background: color-mix(in srgb, var(--muted) 20%, transparent); color: var(--fg); }
 .it-row.on .dots:hover, .it-row.on .dots:focus-visible { color: var(--bg); background: color-mix(in srgb, var(--bg) 18%, transparent); }

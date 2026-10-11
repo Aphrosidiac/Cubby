@@ -338,14 +338,14 @@ async function doOpen(brandId: string, opts: OpenOptions): Promise<OpenResult> {
   if (prev && (await isLive(prev))) {
     // still running from an earlier session: adopt it instead of starting a second Chrome
     const s = await attach(brandId, prev, null, false)
-    status(brandId, 'open', { cdpPort: s.port, pid: s.pid })
+    status(brandId, 'open', { cdpPort: s.port, pid: s.pid, touch: !opts.background })
     if (opts.urls?.length) await openTabs(s, opts.urls)
     return result(s)
   }
   status(brandId, 'opening')
   try {
     const s = await launch(brand, opts)
-    status(brandId, 'open', { cdpPort: s.port, pid: s.pid })
+    status(brandId, 'open', { cdpPort: s.port, pid: s.pid, touch: !opts.background })
     if (opts.background) {
       s.background = true
       await minimizeAll(s)
@@ -487,7 +487,7 @@ export async function adoptAll(): Promise<void> {
       if (dt && (await isLive(dt))) {
         try {
           const s = await attach(b.id, dt, null, false)
-          status(b.id, 'open', { cdpPort: s.port, pid: s.pid })
+          status(b.id, 'open', { cdpPort: s.port, pid: s.pid, touch: false })
           return
         } catch (e) {
           console.warn('adopt failed', b.name, e)

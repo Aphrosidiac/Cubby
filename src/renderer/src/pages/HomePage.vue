@@ -413,7 +413,6 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
 .narrow .batch { padding-left: 12px; }
 .narrow .batch .lbl { display: none; }
 .narrow .batch button { padding: 0 9px; }
-.batch :deep(.menu) { color: var(--fg); bottom: calc(100% + 8px); top: auto; }
 .bar-enter-active { transition: opacity 260ms var(--ease-out), transform 420ms var(--ease-out); }
 .bar-leave-active { transition: opacity 160ms var(--ease-cut), transform 160ms var(--ease-cut); }
 .bar-enter-from, .bar-leave-to { opacity: 0; transform: translateY(14px); }

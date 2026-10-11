@@ -118,12 +118,13 @@ export function getBrandRow(id: string): BrandRow {
 }
 
 /** Update live status (launcher calls this) and notify the UI. */
-export function setBrandStatus(id: string, status: BrandStatus, extra: { cdpPort?: number | null; pid?: number | null; error?: string | null } = {}): void {
+/** `touch: false` (background health/cookie jobs, re-adopting after a restart) keeps "Last opened" as it was. */
+export function setBrandStatus(id: string, status: BrandStatus, extra: { cdpPort?: number | null; pid?: number | null; error?: string | null; touch?: boolean } = {}): void {
   const sets = ['status = ?', 'status_error = ?']
   const vals: (string | number | null)[] = [status, extra.error ?? null]
   if (extra.cdpPort !== undefined) { sets.push('cdp_port = ?'); vals.push(extra.cdpPort) }
   if (extra.pid !== undefined) { sets.push('pid = ?'); vals.push(extra.pid) }
-  if (status === 'open') { sets.push('last_opened_at = ?'); vals.push(new Date().toISOString()) }
+  if (status === 'open' && extra.touch !== false) { sets.push('last_opened_at = ?'); vals.push(new Date().toISOString()) }
   db.run(`UPDATE brands SET ${sets.join(', ')} WHERE id = ?`, ...vals, id)
   emit('brand.status', { id, status, error: extra.error ?? null })
 }

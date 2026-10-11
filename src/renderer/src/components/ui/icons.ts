@@ -30,6 +30,8 @@ export const ICONS: Record<string, string> = {
   close: 'M5 5l14 14M19 5 5 19',
   check: 'M4 12.5l5 5L20 6.5',
   chevron: 'M9 5l7 7-7 7',
+  'arrow-up': 'M12 19V5M6 11l6-6 6 6',
+  'arrow-down': 'M12 5v14M6 13l6 6 6-6',
   'chevron-up': 'M5 15l7-7 7 7',
   'chevron-down': 'M5 9l7 7 7-7',
   'chevron-left': 'M15 5l-7 7 7 7',

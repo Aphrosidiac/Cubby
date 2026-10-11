@@ -25,7 +25,7 @@ table { border-collapse: collapse; width: 100%; }
 /* native checkboxes, radios and ranges take the Ink/Bone accent, never the browser blue */
 input[type='checkbox'], input[type='radio'], input[type='range'], progress { accent-color: var(--fg); }
 :focus { outline: none; }
-:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; border-radius: var(--r); box-shadow: 0 0 0 4px rgba(11, 11, 10, .9); }
+:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; box-shadow: 0 0 0 4px rgba(11, 11, 10, .9); }
 [data-theme='dark'] :focus-visible { box-shadow: none; }
 [hidden] { display: none !important; }
 

@@ -47,8 +47,8 @@ const addItems = computed<MenuItem[]>(() => {
   return out;
 });
 const cardMenu = (i: number): MenuItem[] => [
-  { label: 'Move up', icon: 'chevron-down', run: () => move(i, i - 1), disabled: i === 0, hint: 'Alt ↑' },
-  { label: 'Move down', icon: 'chevron-down', run: () => move(i, i + 1), disabled: i === props.modelValue.length - 1, hint: 'Alt ↓' },
+  { label: 'Move up', icon: 'arrow-up', run: () => move(i, i - 1), disabled: i === 0, hint: 'Alt ↑' },
+  { label: 'Move down', icon: 'arrow-down', run: () => move(i, i + 1), disabled: i === props.modelValue.length - 1, hint: 'Alt ↓' },
   { label: 'Duplicate', icon: 'copy', run: () => duplicate(i) },
   { label: props.modelValue[i].note !== undefined || notes.value.has(props.modelValue[i].id) ? 'Remove note' : 'Add note', icon: 'note', run: () => toggleNote(i) },
   { divider: true, label: '' },
@@ -159,8 +159,6 @@ const nested = (s: FlowStep, key: 'then' | 'else' | 'steps', v: FlowStep[]) => (
 .ib:hover { background: var(--panel-2); color: var(--fg); }
 .rot { transform: rotate(-90deg); }
 .ib-sp { width: 30px; flex: none; }
-/* the kit has no chevron-up: "Move up" (always the first item of the card menu) turns its chevron over */
-.hd :deep(.mi:first-of-type svg) { transform: rotate(180deg); }
 .emsg { color: var(--bad); padding: 0 12px 6px 62px; margin-top: -4px; }
 .bd { padding: 4px 14px 14px 62px; display: flex; flex-direction: column; gap: 12px; }
 .d1 .bd, .d2 .bd, .d3 .bd { padding-left: 14px; }
