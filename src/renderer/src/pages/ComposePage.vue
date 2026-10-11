@@ -651,7 +651,7 @@ const leftOutText = computed(() => leftOut.value.map(a => `${a.handle} (${PLATFO
 .ov { font-family: var(--mono); font-size: var(--fs-2xs); text-transform: uppercase; color: var(--muted); }
 .tabbody { padding-top: var(--s4); }
 .actions .whenbody { margin-top: 14px; min-height: 64px; display: flex; flex-direction: column; gap: 8px; }
-.dt { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 6px; align-items: center; }
+.dt { display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); gap: 6px; align-items: center; } /* date + time side by side when both fit whole, else stacked */
 .dt .input { min-height: 38px; padding: 7px 9px; }
 .tz { color: var(--muted); }
 .err { color: var(--bad); }

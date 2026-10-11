@@ -74,7 +74,9 @@ function focusName() {
   if (!el) return;
   el.focus({ preventScroll: true });
   const r = el.getBoundingClientRect();
-  if (r.bottom > window.innerHeight - 96 || r.top < 64) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // scroll only when the sticky footer (or the top bar) really covers it, so the page header stays in view
+  const footTop = document.querySelector('.foot')?.getBoundingClientRect().top ?? window.innerHeight;
+  if (r.bottom > footTop - 8 || r.top < 64) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 onMounted(() => setTimeout(focusName, 250));
 
