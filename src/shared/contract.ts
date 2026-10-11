@@ -145,6 +145,8 @@ export const contract = {
   'settings.get': cmd<Settings>()(none, { readOnly: true }),
   'settings.set': cmd<Settings>()(z.object({ patch: z.record(z.string(), z.unknown()) }), { actors: ['you'] }),
   'settings.setUnlockPassphrase': cmd<Settings>()(z.object({ passphrase: z.string().min(6), current: z.string().optional() }), { actors: ['you'] }),
+  /** sends a test message with the given (or saved) Telegram bot token + chat id */
+  'settings.testTelegram': cmd<{ chat: string }>()(z.object({ botToken: z.string().optional(), chatId: z.string().optional() }), { actors: ['you'], readOnly: true }),
   'settings.setBackupPassphrase': cmd<Settings>()(z.object({ passphrase: z.string().min(8) }), { actors: ['you'] }),
 
   // ── Brands ──────────────────────────────────────────────────────────────────

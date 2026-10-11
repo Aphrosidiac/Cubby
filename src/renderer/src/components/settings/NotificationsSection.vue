@@ -6,8 +6,8 @@ import Field from '@/components/ui/Field.vue';
 import Icon from '@/components/ui/Icon.vue';
 import SaveBar from '@/components/common/SaveBar.vue';
 import { useSection } from './useSection';
-import { ok, toast } from '@/composables/toast';
-import { isMac } from '@/lib/api';
+import { fail, ok, toast } from '@/composables/toast';
+import { api, isMac } from '@/lib/api';
 
 /** OS notifications, and an optional Telegram bot for when you're away from the computer. */
 const { form, dirty, busy, save, discard } = useSection(['notifications']);
@@ -15,9 +15,14 @@ const showTok = ref(false);
 const tokOk = computed(() => !form.notifications.telegramBotToken || /^\d{5,}:[\w-]{30,}$/.test(form.notifications.telegramBotToken.trim()));
 const chatOk = computed(() => !form.notifications.telegramChatId || /^-?\d{3,}$|^@\w{4,}$/.test(form.notifications.telegramChatId.trim()));
 const tgReady = computed(() => !!form.notifications.telegramBotToken?.trim() && !!form.notifications.telegramChatId?.trim() && tokOk.value && chatOk.value);
-function test() {
+const testing = ref(false);
+async function test() {
   if (!tgReady.value) { toast('Add the bot token and chat id first', { tone: 'warn' }); return; }
-  ok('Telegram details look right', dirty.value ? 'Save, then the next notification (a post needing you, a login expiring, a checkpoint) also goes to this chat.' : 'The next notification — a post needing you, a login expiring, a checkpoint — also goes to this chat.');
+  testing.value = true;
+  try {
+    const r = await api('settings.testTelegram', { botToken: form.notifications.telegramBotToken ?? undefined, chatId: form.notifications.telegramChatId ?? undefined });
+    ok(`Test message sent to ${r.chat}`, dirty.value ? 'Save to start getting notifications there.' : undefined);
+  } catch (e) { fail(e, 'Telegram test failed'); } finally { testing.value = false; }
 }
 function setTok(v: string) { form.notifications.telegramBotToken = v.trim() || null; }
 function setChat(v: string) { form.notifications.telegramChatId = v.trim() || null; }
@@ -41,7 +46,7 @@ function setChat(v: string) { form.notifications.telegramChatId = v.trim() || nu
         <Field label="Chat id" for="tg-chat" :error="chatOk ? null : 'A number like 123456789 (or -100… for a group)'" class="w">
           <input id="tg-chat" :value="form.notifications.telegramChatId ?? ''" class="input code" autocomplete="off" spellcheck="false" placeholder="123456789" @input="setChat(($event.target as HTMLInputElement).value)" />
         </Field>
-        <div class="set-pair"><Btn size="sm" icon="check" :disabled="!tgReady" @click="test">Check details</Btn><span class="set-note">Checks the token and chat id look right. Cubby only messages Telegram when something needs you.</span></div>
+        <div class="set-pair"><Btn size="sm" icon="send" :disabled="!tgReady" :loading="testing" @click="test">Send test</Btn><span class="set-note">Sends one test message. After that Cubby only messages Telegram when something needs you.</span></div>
       </div>
     </div>
     <SaveBar :show="dirty" :busy="busy" :disabled="!tokOk || !chatOk" @save="save('Notification settings saved')" @discard="discard" />

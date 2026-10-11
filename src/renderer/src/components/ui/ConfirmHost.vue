@@ -8,7 +8,7 @@ const value = ref('');
 watch(() => confirmState.open, o => { if (o) value.value = confirmState.opts?.input?.value ?? ''; });
 function yes() {
   const o = confirmState.opts;
-  if (o?.input) { if (o.input.required !== false && !value.value.trim()) return; settle(value.value.trim()); }
+  if (o?.input) { if (o.input.required !== false && !value.value.trim()) return; settle(o.input.password ? value.value : value.value.trim()); } // passphrases keep their spaces
   else settle(true);
 }
 const no = () => settle(confirmState.opts?.input ? null : false);

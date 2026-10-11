@@ -51,7 +51,7 @@ watch(() => props.rows, rows => {
     if (!first && !prints.has(k)) next.add(k);
     prints.set(k, p);
   }
-  first = false;
+  if (rows.length) first = false; // an empty placeholder while loading is not the first paint
   if (next.size) { flashing.value = next; setTimeout(() => { flashing.value = new Set(); }, 1700); }
 }, { immediate: true });
 

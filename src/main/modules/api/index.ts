@@ -192,6 +192,8 @@ function buildServer(p: number): FastifyInstance {
   return app
 }
 
+let toldPort = 0
+
 async function listen(): Promise<void> {
   const p = getSettings().apiPort
   const app = buildServer(p)
@@ -200,13 +202,16 @@ async function listen(): Promise<void> {
     server = app
     port = p
     runtime.apiListening = true
+    toldPort = 0
     console.log(`[cubby] Local API on http://127.0.0.1:${p} (MCP at /mcp)`)
   } catch (e) {
     runtime.apiListening = false
     await app.close().catch(() => {})
     const msg = (e as NodeJS.ErrnoException).code === 'EADDRINUSE' ? `Port ${p} is already in use — pick another Local API port in Settings.` : `Local API could not start: ${(e as Error).message}`
     console.warn('[cubby]', msg)
-    toast('bad', msg)
+    // settings changes retry a busy port quietly; the person hears about each port once
+    if (toldPort !== p) toast('bad', msg)
+    toldPort = p
   }
   requestStatus()
 }

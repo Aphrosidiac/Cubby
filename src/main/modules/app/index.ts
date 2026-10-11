@@ -11,6 +11,7 @@ import { db } from '../../core/db'
 import { UserError } from '../../core/errors'
 import { emit } from '../../core/events'
 import { paths } from '../../core/paths'
+import { sendTelegram } from '../../core/notify'
 import { implement } from '../../core/registry'
 import { requestStatus, runtime, setKillSwitch, setStatusEmitter } from '../../core/runtime'
 import { getSecretSetting, getSettings, setSecretSetting, setSettings } from '../../core/settings'
@@ -159,6 +160,17 @@ implement({
     const s = getSettings()
     emit('settings.changed', s)
     return s
+  },
+  'settings.testTelegram': async ({ botToken, chatId }) => {
+    const s = getSettings().notifications
+    const tok = (botToken ?? s.telegramBotToken ?? '').trim()
+    const chat = (chatId ?? s.telegramChatId ?? '').trim()
+    if (!tok || !chat) throw new UserError('Add the bot token and chat id first')
+    try {
+      return await sendTelegram(tok, chat, 'Cubby test message — notifications will arrive in this chat.')
+    } catch (e) {
+      throw new UserError((e as Error).message)
+    }
   },
   'settings.setBackupPassphrase': ({ passphrase }) => {
     if (!safeStorage.isEncryptionAvailable()) throw new UserError('OS encryption is not available')

@@ -47,7 +47,7 @@ export function useBrandActions() {
       const bad = accts.filter(a => a.loginState === 'expired' || a.loginState === 'expiring');
       if (!accts.length) toast(`${b.name} has no accounts to check`);
       else if (!bad.length) ok(`${b.name}: all ${accts.length} logins fine`);
-      else toast(`${b.name}: ${bad.length} need attention`, { tone: 'warn', body: bad.map(a => `${PLATFORM_SPECS[a.platform]?.name} ${a.handle} — ${LOGIN_LABEL[a.loginState]}`).join(' · ') });
+      else toast(`${b.name}: ${bad.length} ${bad.length === 1 ? "needs" : "need"} attention`, { tone: 'warn', body: bad.map(a => `${PLATFORM_SPECS[a.platform]?.name} ${a.handle} — ${LOGIN_LABEL[a.loginState]}`).join(' · ') });
     } catch (e) { fail(e, 'Health check failed'); }
   }
 
