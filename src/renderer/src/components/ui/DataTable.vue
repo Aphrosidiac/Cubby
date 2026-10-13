@@ -72,12 +72,12 @@ onBeforeUnmount(() => ro?.disconnect());
     <table ref="tbl">
       <thead>
         <tr>
-          <th v-for="c in columns" :key="c.key" :style="{ width: c.width, textAlign: c.align ?? 'left' }" :class="[c.class, { sortable: c.sortable, 'hide-sm': c.hideSm }]"
+          <th v-for="c in columns" :key="c.key" :style="{ width: c.width, textAlign: c.align ?? 'left' }" :class="['tbl-head', c.class, { sortable: c.sortable, 'hide-sm': c.hideSm }]"
             :aria-sort="c.sortable ? (sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none') : undefined">
             <button v-if="c.sortable" type="button" class="th" :title="`Sort by ${c.label.toLowerCase()}`" @click="toggleSort(c)">{{ c.label }}<Icon name="chevron-down" :size="11" class="sort-i" :class="{ on: sort?.key === c.key, up: sort?.key === c.key && sort.dir === -1 }" /></button>
             <span v-else class="th">{{ c.label }}</span>
           </th>
-          <th v-if="clickable" class="arrow-col" aria-hidden="true" />
+          <th v-if="clickable" class="tbl-head arrow-col" aria-hidden="true" />
         </tr>
       </thead>
       <tbody v-if="loading && !rows?.length">
@@ -108,7 +108,8 @@ onBeforeUnmount(() => ro?.disconnect());
 .ff-table.scrolls { overflow-x: auto; }
 table { width: 100%; border-collapse: separate; border-spacing: 0; }
 /* sticks under the app's top bar; a drawer or modal body resets --table-top to 0 */
-th { position: sticky; top: var(--table-top, var(--topbar)); z-index: 2; background: var(--table-bg, var(--bg)); padding: 10px 14px; border-bottom: 1px solid var(--fg); font-family: var(--mono); font-size: var(--fs-2xs); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; text-align: left; }
+/* type from the kit's .tbl-head (base.css), shared with grid tables such as Activity */
+th { position: sticky; top: var(--table-top, var(--topbar)); z-index: 2; background: var(--table-bg, var(--bg)); padding: 10px 14px; border-bottom: 1px solid var(--fg); text-align: left; }
 .th { display: inline-flex; align-items: center; gap: 4px; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
 button.th { cursor: pointer; padding: 2px 0; margin: -2px 0; border-radius: var(--r-sm); transition: color var(--t-micro); }
 button.th:hover, th[aria-sort='ascending'] .th, th[aria-sort='descending'] .th { color: var(--fg); }

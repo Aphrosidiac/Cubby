@@ -7,6 +7,7 @@ import Field from '@/components/ui/Field.vue';
 import Modal from '@/components/ui/Modal.vue';
 import Chip from '@/components/ui/Chip.vue';
 import CopyField from '@/components/ui/CopyField.vue';
+import TokenList from '@/components/claude/TokenList.vue';
 import Segmented from '@/components/ui/Segmented.vue';
 import SaveBar from '@/components/common/SaveBar.vue';
 import BrandAvatar from '@/components/common/BrandAvatar.vue';
@@ -17,7 +18,6 @@ import { app } from '@/lib/store';
 import { useLoad } from '@/composables/useLoad';
 import { confirm } from '@/composables/confirm';
 import { fail, ok } from '@/composables/toast';
-import { ago, date } from '@/lib/format';
 
 /** The Local API + MCP door on 127.0.0.1: port, URLs, and scoped tokens (shown once). */
 const { form, dirty, busy, save, discard } = useSection(['apiPort']);
@@ -32,10 +32,7 @@ const SCOPE_HELP: Record<TokenScope, string> = {
   mcp: 'Connect as an MCP client (Claude Code)'
 };
 const tokens = useLoad(() => api('tokens.list'));
-const active = computed(() => (tokens.data.value ?? []).filter(t => !t.revokedAt));
-const revoked = computed(() => (tokens.data.value ?? []).filter(t => t.revokedAt));
 const brands = useLoad(() => api('brands.list', {}), { topics: ['brands.changed'] });
-const brandName = (id: string) => brands.data.value?.find(b => b.id === id)?.name ?? id;
 
 const creating = ref(false);
 const draft = ref({ name: '', scopes: new Set<TokenScope>(['read']), restrict: 'all' as 'all' | 'some', brandIds: new Set<string>() });
@@ -53,12 +50,14 @@ async function create() {
     void tokens.reload(true);
   } catch (e) { fail(e, 'Could not create the token'); } finally { cBusy.value = false; }
 }
+const revoking = ref<string | null>(null);
 async function revoke(t: ApiToken) {
-  if (!(await confirm({ title: `Revoke “${t.name}”?`, body: 'Anything using this token stops working immediately.', confirm: 'Revoke token', danger: true }))) return;
-  try { await api('tokens.revoke', { id: t.id }); ok('Token revoked'); void tokens.reload(true); } catch (e) { fail(e); }
+  if (!(await confirm({ title: `Revoke “${t.name}”?`, body: 'Anything using it (Claude Code, scripts) stops working immediately.', confirm: 'Revoke', danger: true }))) return;
+  revoking.value = t.id;
+  try { await api('tokens.revoke', { id: t.id }); ok('Token revoked', `“${t.name}” no longer works.`); await tokens.reload(true); } catch (e) { fail(e, 'Could not revoke the token'); }
+  finally { revoking.value = null; }
 }
 async function savePort() { if (portOk.value) await save('Port saved — restart Cubby if the API doesn’t come up on the new port'); }
-const showRevoked = ref(false);
 </script>
 
 <template>
@@ -66,11 +65,12 @@ const showRevoked = ref(false);
     <div class="set-row">
       <div class="set-l"><span class="t">Local API</span><span class="d">REST on this computer only (127.0.0.1) for your own scripts, and the MCP endpoint Claude Code connects to. Every call needs a token.</span></div>
       <div class="set-c full">
-        <span class="set-status" :class="app.status?.apiListening ? 'ok' : 'bad'"><span class="d" />{{ app.status?.apiListening ? 'Listening' : 'Not running — the port may be taken by another app' }}</span>
+        <!-- the same status chip as the Claude page's Server card -->
+        <div class="set-pair"><Chip :tone="app.status?.apiListening ? 'good' : 'bad'">{{ app.status?.apiListening ? 'Listening' : 'Not listening' }}</Chip><span v-if="!app.status?.apiListening" class="tiny muted">The port may be taken by another app.</span></div>
         <div class="set-pair"><span class="small muted">Port</span><input v-model.number="form.apiPort" type="number" min="1024" max="65535" class="input num" /><span v-if="!portOk" class="tiny bad">1024–65535</span></div>
         <div class="urls">
-          <CopyField :value="app.status?.apiUrl ?? `http://127.0.0.1:${form.apiPort}`" label="API" mono />
-          <CopyField :value="app.status?.mcpUrl ?? `http://127.0.0.1:${form.apiPort}/mcp`" label="MCP" mono />
+          <CopyField :value="app.status?.apiUrl ?? `http://127.0.0.1:${form.apiPort}`" label="API URL" mono />
+          <CopyField :value="app.status?.mcpUrl ?? `http://127.0.0.1:${form.apiPort}/mcp`" label="MCP URL" mono />
         </div>
       </div>
     </div>
@@ -80,21 +80,9 @@ const showRevoked = ref(false);
         <div class="set-pair"><Btn size="sm" variant="primary" icon="plus" @click="openCreate">New token</Btn><Btn size="sm" variant="subtle" icon="claude" to="/claude">Connect Claude Code</Btn></div>
         <LoadError v-if="tokens.error.value" compact :error="tokens.error.value" title="Could not load tokens" @retry="tokens.reload()" />
         <div v-else-if="tokens.loading.value" class="skel-line" style="width: 50%" />
-        <p v-else-if="!active.length" class="set-note">No tokens yet.</p>
-        <ul v-else class="tl">
-          <li v-for="t in active" :key="t.id">
-            <div class="grow">
-              <div class="row gap-2"><span class="strong small">{{ t.name }}</span><span class="code muted">{{ t.prefix }}…</span></div>
-              <div class="sc"><Chip v-for="s in t.scopes" :key="s" size="sm" :tone="s === 'cdp' ? 'warn' : 'neutral'" :dot="false">{{ s }}</Chip><span class="tiny muted">{{ t.brandIds ? `${t.brandIds.length} brand${t.brandIds.length === 1 ? '' : 's'}: ${t.brandIds.map(brandName).join(', ')}` : 'All brands' }}</span></div>
-            </div>
-            <span class="tiny muted nowrap">Created {{ date(t.createdAt) }} · {{ t.lastUsedAt ? `used ${ago(t.lastUsedAt)}` : 'never used' }}</span>
-            <Btn size="sm" variant="danger" @click="revoke(t)">Revoke</Btn>
-          </li>
-        </ul>
-        <button v-if="revoked.length" type="button" class="link tiny muted self-start" @click="showRevoked = !showRevoked">{{ showRevoked ? 'Hide' : 'Show' }} {{ revoked.length }} revoked</button>
-        <ul v-if="showRevoked && revoked.length" class="tl dim">
-          <li v-for="t in revoked" :key="t.id"><span class="small grow">{{ t.name }} <span class="code muted">{{ t.prefix }}…</span></span><span class="tiny muted">revoked {{ ago(t.revokedAt) }}</span></li>
-        </ul>
+        <TokenList v-else :tokens="tokens.data.value ?? []" :revoking="revoking" framed @revoke="revoke">
+          <template #empty><p class="set-note">No tokens yet.</p></template>
+        </TokenList>
       </div>
     </div>
     <SaveBar :show="dirty" :busy="busy" :disabled="!portOk" @save="savePort" @discard="discard" />
@@ -137,11 +125,6 @@ const showRevoked = ref(false);
 .urls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 640px; }
 @media (max-width: 1200px) { .urls { grid-template-columns: minmax(0, 1fr); } }
 .bad { color: var(--bad); }
-.tl { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); }
-.tl li { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 16px; }
-.tl li + li { border-top: 1px solid var(--line-soft); }
-.tl.dim { opacity: .7; }
-.sc { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
 .scopes { display: flex; flex-direction: column; gap: 4px; }
 .scope { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-soft); cursor: pointer; transition: border-color 160ms, background-color 160ms; }
 .scope.on { border-color: var(--line-strong); background: var(--panel-2); }

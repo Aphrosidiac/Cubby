@@ -9,6 +9,8 @@ import CubbyMark from './CubbyMark.vue'
 const props = defineProps<{ counts: Record<string, number>; collapsed: boolean }>()
 defineEmits<{ toggle: [] }>()
 const route = useRoute()
+/** running index of each group's first item, for the staggered rise */
+const start = NAV.map((_, gi) => NAV.slice(0, gi).reduce((n, g) => n + g.items.length + (g.group ? 1 : 0), 0))
 const nav = ref<HTMLElement | null>(null)
 const marker = ref({ y: 0, h: 0, show: false })
 const isActive = (it: NavItem) =>
@@ -42,7 +44,7 @@ onMounted(() => {
       <span class="marker" :class="{ show: marker.show }" :style="{ transform: `translateY(${marker.y}px)`, height: `${marker.h}px` }" />
       <template v-for="(g, gi) in NAV" :key="gi">
         <div v-if="g.group" class="group"><span v-if="!collapsed">{{ g.group }}</span><span v-else class="gline" /></div>
-        <RouterLink v-for="(it, i) in g.items" :key="it.to" :to="it.to" :class="{ active: isActive(it) }" :title="collapsed ? it.label : undefined" :style="{ '--i': gi * 4 + i }">
+        <RouterLink v-for="(it, i) in g.items" :key="it.to" :to="it.to" :class="{ active: isActive(it) }" :title="collapsed ? it.label : undefined" :style="{ '--i': start[gi] + i }">
           <Icon :name="it.icon" :size="18" />
           <span v-if="!collapsed" class="txt">{{ it.label }}</span>
           <Transition name="pop">

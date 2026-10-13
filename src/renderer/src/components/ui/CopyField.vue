@@ -11,7 +11,7 @@ async function copy() {
 
 <template>
   <div class="cf">
-    <span v-if="label" class="label">{{ label }}</span>
+    <span v-if="label" class="cf-label">{{ label }}</span>
     <div class="box" :class="{ done }">
       <span class="v ellipsis" :class="{ code: mono }" :title="value">{{ value }}</span>
       <button type="button" class="cp" :aria-label="done ? 'Copied' : 'Copy'" @click="copy">
@@ -24,6 +24,8 @@ async function copy() {
 
 <style scoped>
 .cf { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+/* the kit's one field-label style (as Field): sans, not mono caps */
+.cf-label { font-size: var(--fs-sm); font-weight: 500; color: var(--fg-2); letter-spacing: .002em; }
 .box { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--panel); transition: border-color 300ms; min-width: 0; }
 .box.done { border-color: var(--fg); }
 .v { flex: 1; font-size: var(--fs-sm); color: var(--fg-2); }

@@ -4,9 +4,11 @@ import { RouterLink } from 'vue-router';
 import Icon from './Icon.vue';
 
 /**
- * Buttons are pills (as on ffdev.studio). primary = Ink, signal = the one
- * Signal Lime action on a screen, ghost = hairline, subtle = text-weight.
- * Hover sweeps a fill in on the slash angle; press settles.
+ * Buttons are pills (as on ffdev.studio). primary = Ink (the main action), ghost = hairline,
+ * subtle = text-weight, danger = red hairline. Lime is never a button surface: `signal` is kept
+ * only so old call sites compile and renders exactly as primary.
+ * Hover sweeps a fill in on the slash angle; press settles. Disabled = the same variant, faded
+ * (opacity only — no grey fill), with no hover, sweep or press.
  */
 const props = withDefaults(defineProps<{
   variant?: 'primary' | 'signal' | 'ghost' | 'subtle' | 'danger';
@@ -16,7 +18,9 @@ const props = withDefaults(defineProps<{
 }>(), { variant: 'ghost', size: 'md', type: 'button' });
 
 const tag = computed(() => (props.to ? RouterLink : props.href ? 'a' : 'button'));
-const attrs = computed(() => props.to ? { to: props.to } : props.href ? { href: props.href, target: props.target, rel: props.target === '_blank' ? 'noopener' : undefined, download: props.download === true ? '' : props.download || undefined } : { type: props.type, disabled: props.disabled || props.loading });
+// a disabled link can't take the disabled attribute: it leaves the tab order and ignores the pointer
+const off = computed(() => (props.to || props.href) && props.disabled ? { 'aria-disabled': 'true', tabindex: -1 } : {});
+const attrs = computed(() => ({ ...(props.to ? { to: props.to } : props.href ? { href: props.href, target: props.target, rel: props.target === '_blank' ? 'noopener' : undefined, download: props.download === true ? '' : props.download || undefined } : { type: props.type, disabled: props.disabled || props.loading }), ...off.value }));
 </script>
 
 <template>
@@ -54,10 +58,8 @@ const attrs = computed(() => props.to ? { to: props.to } : props.href ? { href: 
 .sweep { position: absolute; inset: -2px -30%; z-index: 0; transform: translateX(-102%) skewX(calc(var(--slash) * -1)); transition: transform 460ms var(--ease-out); pointer-events: none; }
 .btn:hover:not(.disabled):not(:disabled) .sweep { transform: translateX(0) skewX(calc(var(--slash) * -1)); }
 
-.v-primary { background: var(--fg); color: var(--bg); }
-.v-primary .sweep { background: color-mix(in srgb, var(--bg) 16%, var(--fg)); }
-.v-signal { background: var(--lime); color: var(--ink); }
-.v-signal .sweep { background: var(--ink); }
+.v-primary, .v-signal { background: var(--fg); color: var(--bg); }
+.v-primary .sweep, .v-signal .sweep { background: color-mix(in srgb, var(--bg) 16%, var(--fg)); }
 .v-ghost { background: transparent; color: var(--fg); border-color: var(--line-strong); }
 .v-ghost .sweep { background: var(--panel-2); }
 .v-ghost:hover:not(.disabled):not(:disabled) { border-color: var(--fg); }
@@ -69,11 +71,13 @@ const attrs = computed(() => props.to ? { to: props.to } : props.href ? { href: 
 /* text over the red sweep: the page colour reads in both themes (white on the dark theme's
    salmon red was 2:1); a disabled/loading button gets no sweep, so it keeps its red text */
 .v-danger:hover:not(.disabled):not(:disabled) { color: var(--bg); border-color: var(--bad); }
-.v-signal:hover:not(.disabled):not(:disabled) { color: var(--lime); }
-.disabled, .btn:disabled { opacity: .45; cursor: not-allowed; }
+/* one disabled look for every variant and theme: the real button at 40% — its own fill, border
+   and text colour, never a grey slab — and nothing reacts to the pointer */
+.disabled, .btn:disabled { opacity: .4; cursor: not-allowed; }
+a.btn.disabled { pointer-events: none; }
 /* busy is not disabled: the spinner stays at full strength */
 .btn.loading:not(.disabled) { opacity: 1; cursor: progress; }
 .spin { width: 15px; height: 15px; border-radius: 50%; border: 1.6px solid currentColor; border-right-color: transparent; animation: ff-spin .7s linear infinite; }
 .ir { transition: transform 300ms var(--ease-out); }
-.btn:hover .ir { transform: translateX(3px); }
+.btn:hover:not(.disabled):not(:disabled) .ir { transform: translateX(3px); }
 </style>

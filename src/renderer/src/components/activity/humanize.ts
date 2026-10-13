@@ -56,6 +56,15 @@ export function humanAction(a: Pick<Activity, 'action' | 'detail'>): { text: str
   return { text: failed ? `Failed: ${text.charAt(0).toLowerCase()}${text.slice(1)}` : text, failed, guard };
 }
 
+/** The one colour rule for activity rows, shared by the Activity page, a brand's Activity tab and the
+ *  Claude page: anything that failed or that a guardrail blocked reads red; everything else is ink. */
+export function activityTone(a: Pick<Activity, 'action' | 'detail'>): 'bad' | null {
+  const h = humanAction(a);
+  return h.failed || h.guard ? 'bad' : null;
+}
+
+/** First letter up: detail lines are sentence case like every other line in the app. */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** quietHours → "quiet hours" */
 const words = (k: string) => k.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase();
 const pick = (o: unknown, k: string): unknown => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined);
@@ -66,29 +75,31 @@ export function detailLine(a: Pick<Activity, 'action' | 'detail'>): string {
   const err = pick(d, 'error');
   const rule = pick(d, 'rule');
   const label = typeof rule === 'string' ? RULES[rule] : undefined;
-  if (typeof err === 'string') return label && !err.toLowerCase().startsWith(label.toLowerCase()) ? `${label} · ${err}` : err;
+  if (typeof err === 'string') return label && !err.toLowerCase().startsWith(label.toLowerCase()) ? `${label} · ${err}` : cap(err);
   const input = pick(d, 'input');
   for (const k of ['name', 'caption', 'url', 'handle', 'message', 'recipe', 'path', 'reason', 'scheduledAt', 'key', 'value', 'mode']) {
     const v = pick(input, k);
     if (typeof v !== 'string' || !v.trim()) continue;
-    // a timestamp reads as wall time in the person's zone ("for 12 Oct, 8:00 pm"), never raw ISO
-    if (k === 'scheduledAt') return `for ${dateTime(v)}`;
-    return v.length > 120 ? `${v.slice(0, 120)}…` : v;
+    // a timestamp reads as wall time in the person’s zone ("For 12 Oct, 8:00 pm"), never raw ISO
+    if (k === 'scheduledAt') return `For ${dateTime(v)}`;
+    const t = v.length > 120 ? `${v.slice(0, 120)}…` : v;
+    // prose fields start upper-case; names, captions, URLs, handles and paths are shown as typed
+    return k === 'message' || k === 'reason' || k === 'mode' ? cap(t) : t;
   }
   const patch = pick(input, 'patch');
-  if (patch && typeof patch === 'object') return `changed ${Object.keys(patch).map(words).join(', ')}`;
+  if (patch && typeof patch === 'object') return cap(Object.keys(patch).map(words).join(', '));
   const ids = pick(input, 'ids');
   if (Array.isArray(ids)) return plural(ids.length, 'item');
   const paths = pick(input, 'paths');
   if (Array.isArray(paths)) return plural(paths.length, 'file');
   const reason = pick(d, 'reason');
-  if (typeof reason === 'string') return reason;
+  if (typeof reason === 'string') return cap(reason);
   // rows written by the scheduler / MCP carry their facts at the top level
   const platform = pick(d, 'platform'), handle = pick(d, 'handle');
   if (typeof platform === 'string') return [platformName(platform as Platform), typeof handle === 'string' ? handle : ''].filter(Boolean).join(' · ');
   const to = pick(d, 'to');
-  if (typeof to === 'string') { const from = pick(d, 'from'); return typeof from === 'string' ? `${from} → ${to}` : `to ${to}`; }
+  if (typeof to === 'string') { const from = pick(d, 'from'); return typeof from === 'string' ? `${from} → ${to}` : `To ${to}`; }
   const via = pick(d, 'via');
-  if (typeof via === 'string') return `token “${via}”`;
+  if (typeof via === 'string') return `Token “${via}”`;
   return '';
 }

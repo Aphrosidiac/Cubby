@@ -38,7 +38,7 @@ const runLink = computed(() => (claudeRun.value?.actor === 'claude' ? '/claude' 
 
 async function kill(onOff: boolean) {
   try {
-    if (onOff && !(await confirm({ title: 'Stop all automation?', body: 'Aborts every running recipe, flow and Claude action now. Nothing new runs until you resume.', confirm: 'Stop everything', danger: true }))) return
+    if (onOff && !(await confirm({ title: 'Stop all automation?', body: 'Aborts every running recipe, flow and Claude action now. Nothing new runs until you resume.', confirm: 'Stop all automation', danger: true }))) return
     app.status = await api('app.killSwitch', { on: onOff })
     toast(onOff ? 'Everything stopped' : 'Automation resumed', { tone: onOff ? 'warn' : 'good' })
   } catch (e) {
@@ -90,12 +90,11 @@ const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.
             <span class="dot" /><span class="pill-t">{{ runLabel }}</span><span v-if="moreRuns" class="pill-n num">+{{ moreRuns }}</span>
           </RouterLink>
         </Transition>
-        <button v-if="!app.status?.killSwitch" class="stop" title="Stop all automation (kill switch)" @click="kill(true)"><Icon name="stop" :size="14" /><span>Stop</span></button>
+        <button v-if="!app.status?.killSwitch" type="button" class="stop" aria-label="Stop all automation" title="Stop all automation (kill switch)" @click="kill(true)"><Icon name="stop" :size="14" /><span>Stop<span class="stop-more"> all automation</span></span></button>
         <Btn variant="primary" size="sm" icon="plus" to="/brands/new">New brand</Btn>
         <Menu :items="THEME" :width="190">
           <button type="button" class="theme" :aria-label="`Theme: ${themeName}`" :title="`Theme: ${themeName}`"><Icon :name="themeIcon" :size="17" /></button>
         </Menu>
-        <div class="wc-space" />
       </header>
       <main class="content">
         <RouterView v-slot="{ Component, route: r }">
@@ -113,12 +112,19 @@ const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.
 .shell { min-height: 100vh; }
 .main { margin-left: var(--sidebar); transition: margin-left 520ms var(--ease-out); min-width: 0; overflow-x: clip; }
 .rail .main { margin-left: var(--sidebar-rail); }
-.top { position: sticky; top: 0; z-index: 200; height: var(--topbar); display: flex; align-items: center; gap: 10px; padding: 0 0 0 28px; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line-soft); -webkit-app-region: drag; }
+/* The bar sits on the page grid: the search pill starts where the content column starts and the
+   actions end where it ends (.content: max 1560px, 40px gutters, centred), except that on Windows
+   the right edge never goes under the caption buttons (--wc-w; 0 on macOS). `100%` in a padding is
+   the width of .main, the same box .content centres in. */
+.top {
+  --gutter: max(40px, calc((100% - 1560px) / 2 + 40px));
+  position: sticky; top: 0; z-index: 200; height: var(--topbar); display: flex; align-items: center; gap: 10px;
+  padding: 0 max(var(--gutter), calc(var(--wc-w, 140px) + 6px)) 0 var(--gutter);
+  background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line-soft); -webkit-app-region: drag;
+}
 .top > * { -webkit-app-region: no-drag; }
 .top .grow { -webkit-app-region: drag; }
-/* room for the window's caption buttons: --wc-w comes from the kit (titlebar-area env, 0 on macOS) */
-.wc-space { width: var(--wc-w, 140px); min-width: 12px; flex: none; -webkit-app-region: drag; }
-.mac .wc-space { width: var(--wc-w, 16px); min-width: 16px; }
+.mac .top { padding-right: var(--gutter); }
 /* At the minimum window width the search pill gives way first (never below 140px), so the
    right-hand controls never slide under the Windows caption buttons. */
 .search { display: flex; align-items: center; gap: 10px; flex: 0 1 420px; min-width: 140px; height: 36px; padding: 0 8px 0 14px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: var(--fs-base); text-align: left; transition: border-color 200ms, box-shadow 300ms var(--ease-out); }
@@ -141,6 +147,9 @@ const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.
 .stop, .stopped { flex: none; }
 .stop { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--bad) 35%, transparent); color: var(--bad); font-size: var(--fs-sm); font-weight: 500; transition: background-color 200ms, color 200ms; }
 .stop:hover, .stop:focus-visible { background: var(--bad); color: var(--bg); }
+/* the full words of the action (as on the Claude page) when the bar has room for them */
+.stop-more { display: none; }
+@media (min-width: 1280px) { .stop-more { display: inline; } }
 .theme { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--fg-2); transition: background-color 200ms, color 200ms; }
 .theme:hover { background: var(--panel-2); color: var(--fg); }
 .content { padding: 32px 40px 96px; max-width: 1560px; margin: 0 auto; }

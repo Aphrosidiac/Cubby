@@ -31,7 +31,9 @@ const tone = computed(() => props.tone ?? s.value?.tone ?? 'neutral');
 .t-info { background: var(--info-bg); color: var(--info); }
 .t-muted { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
 .t-ink { background: var(--fg); color: var(--bg); }
-.t-signal { background: var(--ink); color: var(--lime); }
-.t-signal .d { background: var(--lime); }
+/* "live" status: a neutral chip whose only lime is the pulsing dot — lime is a signal, never a
+   chip fill or status text. The dot gets a thin ink ring so it holds on the light theme. */
+.t-signal { background: var(--panel-2); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
+.t-signal .d { background: var(--lime); box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 55%, transparent); }
 .live::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--lime); animation: ff-pulse 1.8s var(--ease-out) infinite; }
 </style>

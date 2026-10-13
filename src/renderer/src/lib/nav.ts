@@ -12,7 +12,12 @@ export interface NavItem {
 export const NAV: { group?: string; items: NavItem[] }[] = [
   {
     items: [
-      { to: '/', label: 'Brands', icon: 'cubby', exact: true, badge: 'needsRelogin', tone: 'bad', shortcut: 'g b' },
+      { to: '/', label: 'Brands', icon: 'cubby', exact: true, badge: 'needsRelogin', tone: 'bad', shortcut: 'g b' }
+    ]
+  },
+  {
+    group: 'Posting',
+    items: [
       { to: '/compose', label: 'Compose', icon: 'compose', shortcut: 'g c' },
       { to: '/calendar', label: 'Calendar', icon: 'calendar', shortcut: 'g k' },
       { to: '/approvals', label: 'Approvals', icon: 'approve', badge: 'approvals', tone: 'signal', shortcut: 'g a' }

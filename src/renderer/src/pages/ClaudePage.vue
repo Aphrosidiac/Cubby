@@ -13,13 +13,14 @@ import CopyField from '@/components/ui/CopyField.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ActorChip from '@/components/activity/ActorChip.vue';
 import TokenModal from '@/components/claude/TokenModal.vue';
+import TokenList from '@/components/claude/TokenList.vue';
 import BrandAvatar from '@/components/common/BrandAvatar.vue';
 import { GUARDRAILS } from '@/components/claude/guardrails';
-import { detailLine, humanAction } from '@/components/activity/humanize';
+import { activityTone, detailLine, humanAction } from '@/components/activity/humanize';
 import { brandById, brandName, useBrands } from '@/components/posts/meta';
 import { api, on } from '@/lib/api';
 import { app } from '@/lib/store';
-import { ago, dateTime, plural } from '@/lib/format';
+import { ago, dateTime, meta, plural } from '@/lib/format';
 import { useLoad } from '@/composables/useLoad';
 import { fail, ok, toast } from '@/composables/toast';
 import { confirm } from '@/composables/confirm';
@@ -35,6 +36,8 @@ const killed = computed(() => !!status.value?.killSwitch);
 const clients = computed(() => (status.value?.mcpClients ?? []).map(c => ({ ...c, working: !!c.lastCallAt && now.value - new Date(c.lastCallAt).getTime() < 30_000 })));
 const working = computed(() => clients.value.some(c => c.working) || (status.value?.runs ?? []).some(r => r.actor === 'claude'));
 const runs = computed(() => status.value?.runs ?? []);
+/** something is running right now: any run, or a Claude call in the last 30 s — the Stop button turns solid */
+const busyNow = computed(() => runs.value.length > 0 || clients.value.some(c => c.working));
 /** app.status reports a session's brand lock by NAME (mcp touch()); an id is accepted too. */
 const lockBrand = (v: string) => brandById(v) ?? brands.list.find(b => b.name === v) ?? { name: v, color: null, logo: null };
 const agoNow =(iso: string | null) => { void now.value; return iso ? ago(iso) : 'never'; };
@@ -42,7 +45,7 @@ const agoNow =(iso: string | null) => { void now.value; return iso ? ago(iso) : 
 // ── kill switch ───────────────────────────────────────────────────────────────
 const killing = ref(false);
 async function kill(onOff: boolean) {
-  if (onOff && !(await confirm({ title: 'Stop all automation?', body: 'Aborts every running recipe, flow and Claude action now. Nothing new runs until you resume.', confirm: 'Stop everything', danger: true }))) return;
+  if (onOff && !(await confirm({ title: 'Stop all automation?', body: 'Aborts every running recipe, flow and Claude action now. Nothing new runs until you resume.', confirm: 'Stop all automation', danger: true }))) return;
   killing.value = true;
   try { app.status = await api('app.killSwitch', { on: onOff }); toast(onOff ? 'Everything stopped' : 'Automation resumed', { tone: onOff ? 'warn' : 'good' }); }
   catch (e) { fail(e); }
@@ -71,9 +74,6 @@ async function connect() {
 
 // ── tokens ───────────────────────────────────────────────────────────────────
 const tokens = useLoad(() => api('tokens.list'));
-const activeTokens = computed(() => (tokens.data.value ?? []).filter(t => !t.revokedAt));
-const revokedTokens = computed(() => (tokens.data.value ?? []).filter(t => t.revokedAt).sort((a, b) => String(b.revokedAt).localeCompare(String(a.revokedAt))));
-const showRevoked = ref(false);
 const tokenOpen = ref(false);
 const revoking = ref<string | null>(null);
 async function revoke(t: ApiToken) {
@@ -91,9 +91,7 @@ onBeforeUnmount(offAct);
 
 <template>
   <div class="page claude">
-    <PageHeader eyebrow="Control" title="Claude">
-      <span>Claude drives brand windows through Cubby’s MCP server — every call goes through the guardrails below.</span>
-    </PageHeader>
+    <PageHeader eyebrow="Control" title="Claude" description="Claude drives brand windows through Cubby’s MCP server — every call goes through the guardrails below." />
 
     <section class="hero" :class="{ killed, working: working && !killed }">
       <div class="state">
@@ -109,8 +107,10 @@ onBeforeUnmount(offAct);
         </div>
       </div>
       <div class="hero-act">
-        <button v-if="!killed" type="button" class="stopbtn" :disabled="killing" @click="kill(true)"><Icon name="stop" :size="18" /><span>Stop everything</span></button>
-        <Btn v-else variant="signal" size="lg" icon="play" :loading="killing" @click="kill(false)">Resume</Btn>
+        <!-- the same action and words as the top bar's Stop: a red outline at rest, solid red while
+             something is actually running (a run, or a Claude call in the last 30 s) -->
+        <button v-if="!killed" type="button" class="stopbtn" :class="{ live: busyNow }" :disabled="killing" title="Stop all automation (kill switch)" @click="kill(true)"><Icon name="stop" :size="18" /><span>Stop all automation</span></button>
+        <Btn v-else variant="primary" size="lg" icon="play" :loading="killing" @click="kill(false)">Resume</Btn>
       </div>
     </section>
 
@@ -133,7 +133,7 @@ onBeforeUnmount(offAct);
               <span class="cdot" :class="{ on: c.working }" />
               <div class="grow">
                 <div class="cname"><span class="small strong ellipsis" :title="c.tokenName">{{ c.tokenName }}</span><Chip v-if="c.working" size="sm" tone="signal">Working</Chip></div>
-                <div class="tiny muted">connected {{ agoNow(c.connectedAt) }} · {{ c.lastCallAt ? `last call ${agoNow(c.lastCallAt)}` : 'no calls yet' }}</div>
+                <div class="tiny muted">{{ meta(`Connected ${agoNow(c.connectedAt)}`, c.lastCallAt ? `last call ${agoNow(c.lastCallAt)}` : 'no calls yet') }}</div>
                 <!-- the brand this session is locked to (guardrail 1) -->
                 <span v-if="c.brandLock" class="lock small" :title="`Locked to ${lockBrand(c.brandLock).name}`"><Icon name="lock" :size="12" /><BrandAvatar :brand="lockBrand(c.brandLock)" :size="16" /><span class="ellipsis">{{ lockBrand(c.brandLock).name }}</span></span>
                 <span v-else class="lock none tiny muted"><Icon name="unlock" :size="12" />Not locked to a brand yet</span>
@@ -194,38 +194,9 @@ onBeforeUnmount(offAct);
         <div class="panel-body">
           <div v-if="tokens.loading.value" class="col"><div v-for="i in 3" :key="i" class="skel-line" style="height: 36px" /></div>
           <p v-else-if="tokens.error.value" class="small muted">Tokens aren’t available yet — {{ tokens.error.value }}</p>
-          <template v-else>
-            <p v-if="!activeTokens.length" class="small muted">No active tokens. Connecting Claude Code creates one.</p>
-            <ul v-else class="tokens">
-              <li v-for="t in activeTokens" :key="t.id">
-                <div class="grow">
-                  <div class="tname"><span class="small strong ellipsis" :title="t.name">{{ t.name }}</span><span class="code muted nowrap">{{ t.prefix }}…</span></div>
-                  <div class="tiny muted">{{ t.scopes.join(' · ') }} · {{ t.brandIds?.length ? t.brandIds.map(brandName).join(', ') : 'all brands' }}</div>
-                  <div class="tiny muted">created {{ dateTime(t.createdAt) }} · {{ t.lastUsedAt ? `used ${agoNow(t.lastUsedAt)}` : 'never used' }}</div>
-                </div>
-                <Btn size="sm" variant="danger" :loading="revoking === t.id" @click="revoke(t)">Revoke</Btn>
-              </li>
-            </ul>
-            <!-- revoked tokens stay listed (folded) so "why did my script stop?" has an answer -->
-            <div v-if="revokedTokens.length" class="revoked mt-4">
-              <button type="button" class="rv-t tiny muted" :aria-expanded="showRevoked" @click="showRevoked = !showRevoked">
-                <Icon name="chevron-down" :size="12" class="chev" :class="{ rot: showRevoked }" />{{ plural(revokedTokens.length, 'revoked token') }}
-              </button>
-              <Transition name="slide-down">
-                <div v-if="showRevoked" class="rv-wrap">
-                  <ul class="tokens rv">
-                    <li v-for="t in revokedTokens" :key="t.id">
-                      <div class="grow">
-                        <div class="tname"><span class="small ellipsis" :title="t.name">{{ t.name }}</span><span class="code muted nowrap">{{ t.prefix }}…</span></div>
-                        <div class="tiny muted">created {{ dateTime(t.createdAt) }} · revoked {{ dateTime(t.revokedAt) }}</div>
-                      </div>
-                      <Chip size="sm" tone="muted">Revoked</Chip>
-                    </li>
-                  </ul>
-                </div>
-              </Transition>
-            </div>
-          </template>
+          <TokenList v-else :tokens="tokens.data.value ?? []" :revoking="revoking" @revoke="revoke">
+            <template #empty><p class="small muted">No active tokens. Connecting Claude Code creates one.</p></template>
+          </TokenList>
           <p class="tiny muted mt-4">Full token settings live in <RouterLink to="/settings?tab=api" class="link">Settings → Local API</RouterLink>.</p>
         </div>
       </section>
@@ -247,7 +218,7 @@ onBeforeUnmount(offAct);
       <p v-else-if="recent.error.value" class="small muted">Could not load activity — {{ recent.error.value }}</p>
       <EmptyState v-else-if="!recent.data.value?.length" compact icon="claude" title="Nothing yet" body="Every tool call Claude makes through Cubby is recorded here." />
       <ul v-else class="recent">
-        <li v-for="a in recent.data.value" :key="a.id" :class="{ failed: humanAction(a).failed, guard: humanAction(a).guard }">
+        <li v-for="a in recent.data.value" :key="a.id" :class="activityTone(a) && `t-${activityTone(a)}`">
           <span class="tiny muted num t" :title="dateTime(a.at)">{{ agoNow(a.at) }}</span>
           <span class="small b ellipsis" :class="{ muted: !a.brandName }" :title="a.brandName ?? undefined">{{ a.brandName ?? '—' }}</span>
           <span class="small strong a ellipsis" :title="humanAction(a).text"><Icon v-if="humanAction(a).guard" name="shield" :size="13" class="gi" />{{ humanAction(a).text }}</span>
@@ -268,15 +239,18 @@ onBeforeUnmount(offAct);
 .working .big-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--lime); animation: ff-pulse 1.8s var(--ease-out) infinite; }
 .killed { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); background: var(--bad-bg); }
 .killed .big-dot { background: var(--bad); }
-.stopbtn { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 26px; border-radius: 99px; background: #b3261e; color: #fff; font-size: var(--fs-md); font-weight: 600; transition: transform 160ms var(--ease-out), filter 200ms; }
-.stopbtn:hover { filter: brightness(1.08); }
-.stopbtn:active { transform: scale(.97); }
-.stopbtn:disabled { opacity: .6; cursor: progress; }
-.stopbtn:focus-visible { outline-color: var(--lime); }
+.stopbtn { display: inline-flex; align-items: center; gap: 10px; height: 50px; padding: 0 24px; border-radius: 99px; border: 1.5px solid color-mix(in srgb, var(--bad) 55%, transparent); background: transparent; color: var(--bad); font-size: var(--fs-md); font-weight: 600; white-space: nowrap; transition: transform 160ms var(--ease-out), background-color 220ms var(--ease-out), border-color 220ms var(--ease-out), color 220ms var(--ease-out); }
+.stopbtn:hover:not(:disabled), .stopbtn.live { background: var(--bad); border-color: var(--bad); color: var(--bg); }
+.stopbtn.live:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 88%, var(--fg)); }
+.stopbtn:active:not(:disabled) { transform: scale(.97); }
+.stopbtn:disabled { opacity: .4; cursor: progress; }
 .hero .state { min-width: 0; }
-.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--s4); align-items: start; }
-.clients li, .tokens li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); }
-.clients li:first-child, .tokens li:first-child { border-top: 0; padding-top: 0; }
+/* cards in one row are one height (rule: equal-height two-column cards) */
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--s4); align-items: stretch; }
+.grid2 > .panel { display: flex; flex-direction: column; }
+.grid2 > .panel > .panel-body { flex: 1 1 auto; }
+.clients li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.clients li:first-child { border-top: 0; padding-top: 0; }
 .cdot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: none; }
 .cdot.on { background: var(--lime); box-shadow: 0 0 0 1px var(--ink); }
 .lock { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 3px 9px 3px 7px; border-radius: 99px; background: var(--panel-2); max-width: 100%; min-width: 0; }
@@ -286,17 +260,8 @@ onBeforeUnmount(offAct);
 .clients li { align-items: flex-start; }
 .clients .cdot { margin-top: 6px; }
 .lock > .icon, .lock > .ba { flex: none; }
-.tname { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .ti { margin-top: 2px; flex: none; }
 .rl { min-width: 0; flex: 0 1 auto; }
-.revoked { border-top: 1px solid var(--line-soft); padding-top: 10px; }
-.rv-t { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px; margin-left: -4px; border-radius: var(--r); }
-.rv-t:hover { color: var(--fg); }
-.rv-t .chev { transition: transform 240ms var(--ease-out); }
-.rot { transform: rotate(180deg); }
-.rv { margin-top: 8px; }
-.rv li { padding: 8px 0; }
-.rv li:first-child { padding-top: 8px; border-top: 1px solid var(--line-soft); }
 .runs { display: flex; flex-direction: column; gap: 6px; }
 .run { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--panel); text-align: left; }
 .run:hover { border-color: var(--fg); }
@@ -317,7 +282,7 @@ onBeforeUnmount(offAct);
 .guards li { display: flex; gap: 12px; padding: 16px; box-shadow: 1px 0 0 var(--line), 0 1px 0 var(--line); }
 .gn { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-size: var(--fs-2xs); background: var(--fg); color: var(--bg); flex: none; }
 .recent li { display: grid; grid-template-columns: 90px 130px auto minmax(0, 1fr); gap: 12px; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--line-soft); }
-.recent li.failed .a { color: var(--bad); }
-.recent li.guard .a { color: var(--warn); }
+/* one colour map with the Activity page (activityTone): failed or blocked = red */
+.recent li.t-bad .a { color: var(--bad); }
 .gi { display: inline; vertical-align: -2px; margin-right: 5px; }
 </style>
