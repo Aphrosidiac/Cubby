@@ -110,14 +110,14 @@ async function reset() {
 .pt th { font-family: var(--mono); font-size: var(--fs-2xs); font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 8px 6px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--line-soft); }
 .pt th:first-child { text-align: left; padding-left: 14px; }
 .pt th.tier { color: var(--fg); border-left: 1px solid var(--line-soft); }
-.pt th.sub { font-size: 10px; letter-spacing: .02em; }
+.pt th.sub { letter-spacing: .02em; }
 .pt tr th.sub:nth-child(3n + 1) { border-left: 1px solid var(--line-soft); }
 .pt td { padding: 4px 4px; border-top: 1px solid var(--line-soft); text-align: center; }
 .pt tbody tr:first-child td { border-top: 0; }
 .pt td:nth-child(3n + 2) { border-left: 1px solid var(--line-soft); }
 .pn { display: flex; align-items: center; gap: 8px; padding-left: 14px !important; white-space: nowrap; text-align: left !important; font-weight: 500; height: 40px; }
 .ni { display: inline-flex; align-items: center; gap: 2px; color: var(--muted); font-size: var(--fs-xs); }
-.ni input { width: 46px; height: 28px; padding: 0 6px; text-align: right; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--fg); font-size: var(--fs-sm); }
+.ni input { width: 46px; height: 28px; padding: 0 6px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--fg); font-size: var(--fs-sm); text-align: center; /* sits under its centred column heading */ }
 .ni input::-webkit-inner-spin-button, .ni input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .ni input:hover { border-color: var(--line); }
 .ni input:focus { border-color: var(--focus-border); background: var(--bg); outline: none; box-shadow: var(--focus-ring); }

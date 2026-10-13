@@ -133,7 +133,7 @@ const themeIcon = computed(() => (app.settings?.theme === 'dark' ? 'moon' : app.
 .search-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search kbd { white-space: nowrap; flex: none; }
 .st-short { display: none; }
-@container (max-width: 250px) { .st-long { display: none; } .st-short { display: inline; } }
+@container (max-width: 300px) { .st-long { display: none; } .st-short { display: inline; } }
 @container (max-width: 150px) { .search kbd { display: none; } }
 .pill { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 99px; font-size: var(--fs-sm); font-weight: 500; white-space: nowrap; }
 .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; position: relative; }

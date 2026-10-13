@@ -237,10 +237,10 @@ const tabs = computed(() => [
   .flows :deep(th.c-brands) { width: 104px !important; }
   .flows :deep(th.c-sched) { width: 176px !important; }
 }
-/* avatar stack: at most 3 marks then a "+N" chip, 4px overlap, each ringed in the row colour so they never smear together */
+/* brand marks: at most 3 then a "+N" chip, side by side — at 20px any overlap clips the initials */
 .avs { display: inline-flex; flex: none; }
 .av { display: inline-grid; border-radius: 5px; box-shadow: 0 0 0 2px var(--bg); }
-.av + .av { margin-left: -4px; }
+.av + .av { margin-left: 3px; }
 .av.more { place-items: center; min-width: 20px; height: 20px; padding: 0 4px; background: var(--panel-2); color: var(--fg-2); font-size: var(--fs-2xs); font-weight: 600; }
 .ib { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
 .ib:hover { background: var(--panel-2); color: var(--fg); }

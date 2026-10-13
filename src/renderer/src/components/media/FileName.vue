@@ -12,8 +12,10 @@ const parts = computed(() => {
   const dot = n.lastIndexOf('.');
   const ext = dot > 0 && n.length - dot <= 6 ? n.slice(dot) : '';
   const stem = ext ? n.slice(0, dot) : n;
-  // keep the last few characters of the stem with the extension when the name is long enough to be cut
-  const keep = stem.length > 14 ? 5 : 0;
+  // keep the stem's last word (after - _ or space, up to 12 chars) with the extension, else its last 5
+  // characters, when the name is long enough to be cut — "carousel-03-…portrait.jpg", not "…trait.jpg"
+  const word = stem.match(/[-_ ]([^-_ ]{1,12})$/)?.[1];
+  const keep = stem.length > 14 ? (word ? word.length : 5) : 0;
   return { head: stem.slice(0, stem.length - keep), tail: stem.slice(stem.length - keep) + ext };
 });
 </script>

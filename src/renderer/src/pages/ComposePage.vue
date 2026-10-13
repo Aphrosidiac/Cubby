@@ -601,7 +601,7 @@ const leftOutText = computed(() => leftOut.value.map(a => `${a.handle} (${PLATFO
             </ul>
             <p v-if="reApproval" class="tiny muted mt-2">Changing the content sends it back for approval; changing only the time keeps the approval.</p>
             <p v-else-if="retrying" class="tiny muted mt-2">{{ approvalNote ? 'Saving prepares it again in the brand window for approval.' : 'Saving puts it back in the queue at the time above; accounts already posted are skipped.' }}</p>
-            <p class="tiny muted keys mt-2"><kbd>Ctrl</kbd> <kbd>Enter</kbd> {{ primaryLabel.toLowerCase() }}<template v-if="!editing || isDraftEdit"><Sep /><kbd>Ctrl</kbd> <kbd>S</kbd> draft</template></p>
+            <p class="tiny muted keys mt-2"><span class="kp"><kbd>Ctrl</kbd> <kbd>Enter</kbd> {{ primaryLabel.toLowerCase() }}</span><template v-if="!editing || isDraftEdit"><Sep /><span class="kp"><kbd>Ctrl</kbd> <kbd>S</kbd> draft</span></template></p>
           </div>
 
           <div v-if="!readOnly" class="panel pad">
@@ -678,4 +678,5 @@ const leftOutText = computed(() => leftOut.value.map(a => `${a.handle} (${PLATFO
 .pvtabs button.on { background: var(--fg); color: var(--bg); }
 .banner { display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: var(--s5); border-radius: var(--r-lg); background: var(--panel-2); color: var(--fg-2); }
 .unsaved { padding-right: 4px; }
+.kp { white-space: nowrap; } /* a shortcut and its action never split across lines */
 </style>

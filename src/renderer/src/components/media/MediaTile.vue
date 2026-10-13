@@ -50,6 +50,8 @@ const fits = computed(() => platformSummary(props.asset));
 .thumb img { width: 100%; height: 100%; object-fit: contain; }
 /* the picture's lower edge (the tile's border draws the other three), so a black or white frame never reads as a hole */
 .thumb::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 -1px 0 var(--line); pointer-events: none; }
+/* on Ink a black frame against the near-black card needs the stronger hairline all round */
+[data-theme='dark'] .thumb::after { box-shadow: inset 0 0 0 1px var(--line-strong); }
 .compact .thumb::after { display: none; }
 /* formats that can be transparent sit on a checkerboard */
 .thumb.alpha { background: repeating-conic-gradient(#d9d6cc 0 25%, #f3efe4 0 50%) 0 0 / 14px 14px; }

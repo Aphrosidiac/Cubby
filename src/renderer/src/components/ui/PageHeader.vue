@@ -39,7 +39,8 @@ defineProps<{ eyebrow?: string; title: string; back?: { to: string; label: strin
 .sub { grid-area: sub; margin-top: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; font-size: var(--fs-base); text-wrap: pretty; min-width: 0; }
 .desc { grid-area: desc; margin-top: 12px; color: var(--muted); font-size: var(--fs-base); line-height: 1.5; max-width: 78ch; text-wrap: pretty; }
 .sub + .desc { margin-top: 6px; }
-@container (max-width: 760px) {
+/* actions stay beside the title down to the minimum window; they drop under it only when really narrow */
+@container (max-width: 560px) {
   .ph { grid-template-columns: minmax(0, 1fr); grid-template-areas: "back" "eyebrow" "title" "sub" "desc" "actions"; }
   .actions { justify-content: flex-start; margin-top: 18px; }
 }

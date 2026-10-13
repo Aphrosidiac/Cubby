@@ -7,14 +7,18 @@ export function newId(prefix = ''): string {
 
 export const nowIso = (): string => new Date().toISOString()
 
+const SLUG_MAX = 40
+
+/** Folder-safe slug, at most 40 characters, cut at a word boundary so it never ends mid-word. */
 export function slugify(s: string): string {
-  return (
-    s
-      .normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 40) || 'brand'
-  )
+  const full = s
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  if (full.length <= SLUG_MAX) return full || 'brand'
+  const cut = full.slice(0, SLUG_MAX + 1)
+  const at = cut.lastIndexOf('-')
+  return (at >= 12 ? cut.slice(0, at) : full.slice(0, SLUG_MAX)).replace(/-+$/, '') || 'brand'
 }

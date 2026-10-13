@@ -100,8 +100,6 @@ async function approveSelected() {
 <style scoped>
 .groups { display: flex; flex-direction: column; gap: var(--s7); }
 .cards { display: flex; flex-direction: column; gap: var(--s4); }
-/* on a wide window the cards stop growing: past this the caption and screenshots only drift apart */
-.cards { max-width: 1200px; }
 .minw { min-width: 0; }
 /* the count and the explanation are two lines, never run together */
 .desc { flex-basis: 100%; text-wrap: pretty; }

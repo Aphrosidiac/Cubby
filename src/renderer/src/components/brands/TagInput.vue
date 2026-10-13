@@ -51,7 +51,7 @@ function onInput() { listOpen.value = true; pickedByArrow.value = false; active.
         <button type="button" class="x" :aria-label="`Remove ${t}`" @click.stop="removeAt(i)"><Icon name="close" :size="11" /></button>
       </span>
     </TransitionGroup>
-    <input :id="id" ref="input" v-model="q" :placeholder="modelValue.length ? '' : placeholder" autocomplete="off" spellcheck="false"
+    <input :id="id" ref="input" v-model="q" :placeholder="modelValue.length ? 'Add…' : placeholder" autocomplete="off" spellcheck="false"
       @keydown="key" @input="onInput" @focus="focused = true" @blur="focused = false; q.trim() && add(q)" />
     <Transition name="pop">
       <ul v-if="focused && listOpen && shown.length" class="sugg" role="listbox">

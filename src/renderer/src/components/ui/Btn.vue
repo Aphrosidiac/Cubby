@@ -74,6 +74,10 @@ const attrs = computed(() => ({ ...(props.to ? { to: props.to } : props.href ? {
 /* one disabled look for every variant and theme: the real button at 40% — its own fill, border
    and text colour, never a grey slab — and nothing reacts to the pointer */
 .disabled, .btn:disabled { opacity: .4; cursor: not-allowed; }
+/* a filled button faded to 40% is a grey slab with a pale label; disabled fills drop to their
+   outline instead, so "not yet" reads as quiet, not as a broken control */
+.v-primary.disabled, .v-primary:disabled, .v-signal.disabled, .v-signal:disabled { background: transparent; color: var(--fg); border-color: var(--line-strong); opacity: .45; }
+.v-primary.loading:not(.disabled), .v-signal.loading:not(.disabled) { background: var(--fg); color: var(--bg); }
 a.btn.disabled { pointer-events: none; }
 /* busy is not disabled: the spinner stays at full strength */
 .btn.loading:not(.disabled) { opacity: 1; cursor: progress; }
