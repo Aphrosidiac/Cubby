@@ -20,6 +20,7 @@ defineProps<{ icon?: string; title: string; body?: string; compact?: boolean }>(
 .art { position: relative; width: 64px; height: 64px; display: grid; place-items: center; margin-bottom: 10px; border-radius: 50%; border: 1px dashed var(--line-strong); }
 .compact .art { width: 46px; height: 46px; margin-bottom: 4px; }
 .ic { color: var(--muted); }
-p { max-width: 380px; line-height: 1.55; }
+.h3 { text-wrap: balance; }
+p { max-width: 380px; line-height: 1.55; text-wrap: pretty; }
 .acts { margin-top: 14px; display: flex; gap: 8px; }
 </style>

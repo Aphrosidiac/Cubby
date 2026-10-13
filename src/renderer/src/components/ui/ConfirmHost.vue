@@ -34,5 +34,5 @@ const no = () => settle(confirmState.opts?.input ? null : false);
 </template>
 
 <style scoped>
-.body { overflow-wrap: anywhere; }
+.body { overflow-wrap: anywhere; text-wrap: pretty; }
 </style>

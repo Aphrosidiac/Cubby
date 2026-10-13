@@ -26,7 +26,7 @@ defineEmits<{ 'update:modelValue': [v: boolean] }>();
 .on .track:focus-visible { box-shadow: inset 0 0 0 1px rgba(11, 11, 10, .18); }
 .txt { display: flex; flex-direction: column; gap: 2px; }
 .lbl { font-size: var(--fs-base); font-weight: 500; }
-.hint { font-size: var(--fs-xs); color: var(--muted); }
+.hint { font-size: var(--fs-xs); color: var(--muted); text-wrap: pretty; }
 .disabled { opacity: .5; cursor: not-allowed; }
 .disabled .track { cursor: not-allowed; }
 </style>

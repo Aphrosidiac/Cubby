@@ -18,7 +18,7 @@ defineProps<{ label?: string; hint?: string; error?: string | null; required?: b
 .field.inline { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--s4); }
 .flabel { font-size: var(--fs-sm); font-weight: 500; color: var(--fg-2); letter-spacing: .002em; }
 .req { color: var(--muted); margin-left: 3px; }
-.hint { font-size: var(--fs-xs); color: var(--muted); line-height: 1.45; }
+.hint { font-size: var(--fs-xs); color: var(--muted); line-height: 1.45; text-wrap: pretty; }
 .err { font-size: var(--fs-xs); color: var(--bad); line-height: 1.45; }
 .invalid :deep(.input), .invalid :deep(.select), .invalid :deep(.textarea) { border-color: var(--bad); }
 </style>

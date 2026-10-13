@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Icon from './Icon.vue';
-import { ago, dateTime } from '@/lib/format';
+import { ago, dateTime, meta } from '@/lib/format';
 
 /** Activity / history feed. Items rise in one after another. */
 defineProps<{ items: { id: string; at: string; kind?: string; body: string; actor?: string | null; title?: string | null }[]; empty?: string }>();
@@ -14,7 +14,7 @@ const ICON: Record<string, string> = { NOTE: 'note', CALL: 'call', WHATSAPP: 'wh
       <div class="body">
         <div v-if="it.title" class="h3 t">{{ it.title }}</div>
         <div class="txt pre">{{ it.body }}</div>
-        <div class="meta"><span :title="dateTime(it.at)">{{ ago(it.at) }}</span><span v-if="it.actor">· {{ it.actor }}</span></div>
+        <div class="meta"><span :title="dateTime(it.at)">{{ meta(ago(it.at), it.actor) }}</span></div>
       </div>
     </li>
   </ol>

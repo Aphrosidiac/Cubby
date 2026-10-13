@@ -28,8 +28,23 @@ export const dateTime = (d?: string | Date | null) => {
   const x = ok(d);
   if (!x) return '—';
   const other = yearOf(x) !== yearOf(new Date());
-  return x.toLocaleString('en-MY', { day: 'numeric', month: 'short', ...(other ? { year: 'numeric' } : {}), hour: 'numeric', minute: '2-digit', timeZone: zone() });
+  return lowerAmPm(x.toLocaleString('en-MY', { day: 'numeric', month: 'short', ...(other ? { year: 'numeric' } : {}), hour: 'numeric', minute: '2-digit', hour12: true, timeZone: zone() }));
 };
+/** Every clock time the app writes reads "9:00 am": lower-case am/pm, no leading zero. */
+const lowerAmPm = (s: string) => s.replace(/(\d)[\s ]?([AaPp])\.?\s?[Mm]\b\.?/g, (_m, d: string, x: string) => `${d} ${x.toLowerCase()}m`);
+/** 9:00 am — an instant's wall-clock time in the person's zone */
+export const time = (d?: string | Date | null) => { const x = ok(d); return x ? lowerAmPm(x.toLocaleTimeString('en-MY', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: zone() })) : '—'; };
+/** "09:00" / "21:30" (a slot or an <input type=time> value) → "9:00 am" / "9:30 pm". Anything else is returned as is. */
+export const clock = (hhmm?: string | null) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm ?? '');
+  if (!m) return hhmm ?? '—';
+  const h = Number(m[1]) % 24;
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'am' : 'pm'}`;
+};
+/** The one meta separator: " · " with a normal space either side. */
+export const SEP = ' · ';
+/** Join the parts that exist with " · " — `meta('3 posts', null, 'Synced')` → "3 posts · Synced". */
+export const meta = (...parts: (string | number | null | undefined | false)[]) => parts.filter(p => p !== null && p !== undefined && p !== false && p !== '').join(SEP);
 /** "1 brand", "3 brands", "0 runs" — `many` for irregular plurals. */
 export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-MY')} ${n === 1 ? one : many}`;
 /** YYYY-MM-DD in Malaysia time, for date inputs. */
