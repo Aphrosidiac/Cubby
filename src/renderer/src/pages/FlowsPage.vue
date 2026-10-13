@@ -4,8 +4,9 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { Flow, FlowRun, RecipeInfo } from '@shared/types';
 import PageHeader from '@/components/ui/PageHeader.vue';
+import Sep from '@/components/posts/Sep.vue';
 import Btn from '@/components/ui/Btn.vue';
-import Chip from '@/components/ui/Chip.vue';
+import StatusChip from '@/components/posts/StatusChip.vue';
 import Icon from '@/components/ui/Icon.vue';
 import Menu from '@/components/ui/Menu.vue';
 import Tabs from '@/components/ui/Tabs.vue';
@@ -18,7 +19,7 @@ import BrandAvatar from '@/components/common/BrandAvatar.vue';
 import RunBrandModal from '@/components/flows/RunBrandModal.vue';
 import { countSteps } from '@/components/flows/steps';
 import { describeSchedule } from '@/components/flows/cron';
-import { KIND_LABEL, brandById, brandOrStub, brandName, runStatus, useBrands } from '@/components/posts/meta';
+import { KIND_LABEL, brandById, brandOrStub, brandName, useBrands } from '@/components/posts/meta';
 import { duration, fmtWhen } from '@/components/posts/time';
 import { api } from '@/lib/api';
 import { ago } from '@/lib/format';
@@ -124,7 +125,7 @@ const tabs = computed(() => [
 
 <template>
   <div class="page flows">
-    <PageHeader eyebrow="Automation" title="Flows">
+    <PageHeader eyebrow="Library" title="Flows">
       <span>Step-by-step automations that run in a brand’s own window, with every guardrail on.</span>
       <template #actions>
         <Btn variant="primary" icon="plus" to="/flows/new">New flow</Btn>
@@ -139,11 +140,11 @@ const tabs = computed(() => [
         <DataTable v-else :class="{ 'is-empty': flows.data.value?.length === 0 }" :columns="flowCols" :rows="flows.data.value" :loading="flows.loading.value" @row-click="r => router.push(`/flows/${r.id}`)">
           <template #cell-name="{ row }">
             <div class="strong ellipsis" :title="row.name">{{ row.name }}</div>
-            <div class="tiny muted ellipsis"><span class="num">{{ countSteps(row.steps) }}</span> {{ countSteps(row.steps) === 1 ? 'step' : 'steps' }}<span v-if="lastRun.get(row.id)" class="narrow-only"> · last run {{ runStatus(lastRun.get(row.id)!.status).label.toLowerCase() }} {{ ago(lastRun.get(row.id)!.startedAt) }}</span></div>
+            <div class="tiny muted ellipsis"><span class="num">{{ countSteps(row.steps) }}</span> {{ countSteps(row.steps) === 1 ? 'step' : 'steps' }}<span v-if="lastRun.get(row.id)" class="narrow-only"><Sep /><StatusChip size="sm" of="run" :status="lastRun.get(row.id)!.status" class="lrchip" />{{ ' ' }}{{ ago(lastRun.get(row.id)!.startedAt) }}</span></div>
           </template>
           <template #cell-brandScope="{ row }">
             <div class="row gap-2" :title="row.brandIds.length ? row.brandIds.map(brandName).join(', ') : undefined">
-              <span v-if="row.brandIds.length" class="avs"><BrandAvatar v-for="id in row.brandIds.slice(0, 4)" :key="id" :brand="brandOrStub(id)" :size="20" /></span>
+              <span v-if="row.brandIds.length" class="avs"><span v-for="id in row.brandIds.slice(0, 3)" :key="id" class="av"><BrandAvatar :brand="brandOrStub(id)" :size="20" /></span><span v-if="row.brandIds.length > 3" class="av more num">+{{ row.brandIds.length - 3 }}</span></span>
               <span class="small muted ellipsis" :class="{ 'wide-only': row.brandIds.length }">{{ scopeText(row as Flow) }}</span>
             </div>
           </template>
@@ -154,7 +155,7 @@ const tabs = computed(() => [
           </template>
           <template #cell-last="{ row }">
             <template v-if="lastRun.get(row.id)">
-              <Chip size="sm" :tone="runStatus(lastRun.get(row.id)!.status).tone">{{ runStatus(lastRun.get(row.id)!.status).label }}</Chip>
+              <StatusChip size="sm" of="run" :status="lastRun.get(row.id)!.status" />
               <div class="tiny muted mt-1">{{ ago(lastRun.get(row.id)!.startedAt) }}</div>
             </template>
             <span v-else class="tiny muted">Never run</span>
@@ -186,12 +187,12 @@ const tabs = computed(() => [
               <span class="ric"><PlatformIcon v-if="r.platform" :platform="r.platform" :size="16" colored /><Icon v-else name="bolt" :size="16" /></span>
               <div class="grow rhead">
                 <h3 class="h3 ellipsis" :title="r.name">{{ r.name }}</h3>
-                <div class="tiny muted ellipsis" :title="kindsText(r)">{{ kindsText(r) }}</div>
+                <div class="tiny muted ellipsis" :title="kindsText(r)"><template v-for="(k, i) in r.kinds" :key="k"><Sep v-if="i" />{{ KIND_LABEL[k] }}</template><template v-if="!r.kinds.length">General</template></div>
               </div>
             </div>
             <p class="small muted desc">{{ r.description }}</p>
             <div class="row rfoot">
-              <span v-if="isPosting(r)" class="tiny muted">Runs from a post</span>
+              <span v-if="isPosting(r)" class="tiny muted rlbl">Runs from a post</span>
               <span class="grow" />
               <Btn v-if="isPosting(r)" size="sm" variant="ghost" icon="compose" to="/compose" title="Posting recipes need a post — write one in the composer and it runs this recipe">Open composer</Btn>
               <Btn v-else size="sm" icon="play" @click="runTarget = { kind: 'recipe', recipe: r }">Run on brand…</Btn>
@@ -207,7 +208,7 @@ const tabs = computed(() => [
           <template #cell-label="{ row }"><div class="ellipsis strongish" :title="row.label">{{ row.label }}</div><div v-if="row.error" class="tiny ellipsis" :class="row.status === 'needs_human' ? 'warnt' : row.status === 'aborted' ? 'muted' : 'bad'" :title="row.error">{{ row.error }}</div></template>
           <template #cell-brandId="{ row }"><span class="row gap-2"><BrandAvatar :brand="brandOrStub(row.brandId)" :size="18" /><span class="small ellipsis" :title="brandName(row.brandId)">{{ brandName(row.brandId) }}</span></span></template>
           <template #cell-actor="{ row }"><ActorChip :actor="row.actor" /></template>
-          <template #cell-status="{ row }"><Chip size="sm" :tone="runStatus(row.status).tone">{{ runStatus(row.status).label }}</Chip></template>
+          <template #cell-status="{ row }"><StatusChip size="sm" of="run" :status="row.status" /></template>
           <template #cell-startedAt="{ row }"><span class="small" :title="fmtWhen(row.startedAt)">{{ ago(row.startedAt) }}</span></template>
           <template #cell-dur="{ row }"><span class="small num muted">{{ row.endedAt ? duration(new Date(row.endedAt).getTime() - new Date(row.startedAt).getTime()) : '…' }}</span></template>
           <template #empty><EmptyState icon="play" title="No runs yet" body="Flows, recipes and posts that run show up here with their log and screenshots." /></template>
@@ -226,6 +227,7 @@ const tabs = computed(() => [
 /* the title column takes what is left and truncates instead of widening the table */
 .flows :deep(td.c-fill) { max-width: 0; }
 .narrow-only { display: none; }
+.lrchip { vertical-align: middle; }
 /* small windows: the secondary columns fold away (last run moves under the flow name) */
 @media (max-width: 1180px) {
   .flows :deep(.c-wide) { display: none; }
@@ -235,20 +237,25 @@ const tabs = computed(() => [
   .flows :deep(th.c-brands) { width: 104px !important; }
   .flows :deep(th.c-sched) { width: 176px !important; }
 }
-.avs { display: inline-flex; }
-.avs > * + * { margin-left: -6px; box-shadow: 0 0 0 2px var(--bg); }
+/* avatar stack: at most 3 marks then a "+N" chip, 4px overlap, each ringed in the row colour so they never smear together */
+.avs { display: inline-flex; flex: none; }
+.av { display: inline-grid; border-radius: 5px; box-shadow: 0 0 0 2px var(--bg); }
+.av + .av { margin-left: -4px; }
+.av.more { place-items: center; min-width: 20px; height: 20px; padding: 0 4px; background: var(--panel-2); color: var(--fg-2); font-size: var(--fs-2xs); font-weight: 600; }
 .ib { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
 .ib:hover { background: var(--panel-2); color: var(--fg); }
 .intro { max-width: 640px; margin-bottom: var(--s5); }
-.rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+/* at most four cards a row: a fifth column is too narrow for "Runs from a post" beside its button */
+.rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(260px, calc((100% - 36px) / 4)), 1fr)); gap: 12px; }
 .recipe { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); }
 .ric { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--panel-2); flex: none; }
-.desc { flex: 1; line-height: 1.45; }
+.desc { flex: 1; line-height: 1.45; text-wrap: pretty; }
 .strongish { font-weight: 500; }
 .bad { color: var(--bad); }
 .warnt { color: var(--warn); }
 .rhead { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.rfoot { gap: 10px; }
+.rfoot { gap: 10px; flex-wrap: nowrap; }
+.rlbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 /* menus in the last rows must not be clipped by the table's scroll box (columns fold before it could overflow) */
 .flows :deep(.ff-table) { overflow: visible; }
 /* no column headings over an empty state */

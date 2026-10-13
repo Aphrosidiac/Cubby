@@ -6,6 +6,7 @@ import PlatformIcon from '@/components/common/PlatformIcon.vue';
 import { fileUrl } from '@/lib/api';
 import { clock } from '@/components/posts/time';
 import { aspectLabel, fitTitle, platformSummary } from './fit';
+import FileName from './FileName.vue';
 
 /** One library item: thumbnail, duration, aspect and a per-platform fit strip. */
 const props = defineProps<{ asset: MediaAsset; selected?: boolean; order?: number | null; selectable?: boolean; compact?: boolean }>();
@@ -17,7 +18,7 @@ const fits = computed(() => platformSummary(props.asset));
 <template>
   <div class="tile" :class="{ selected, missing: asset.missing, compact }" role="button" tabindex="0" :title="compact ? asset.filename : undefined" :aria-label="asset.filename" :aria-pressed="selectable ? !!selected : undefined"
     @click="selectable ? $emit('toggle') : $emit('open')" @keydown.enter.prevent="selectable ? $emit('toggle') : $emit('open')" @keydown.space.prevent="$emit('toggle')">
-    <div class="thumb">
+    <div class="thumb" :class="{ alpha: !!asset.thumb && /.(png|webp|gif|svg|avif)$/i.test(asset.thumb) }">
       <img v-if="asset.thumb && !broken" :src="fileUrl(asset.thumb)" alt="" loading="lazy" draggable="false" @error="broken = true" />
       <div v-else class="ph"><Icon :name="asset.kind === 'video' ? 'video' : 'image'" :size="22" /></div>
       <span v-if="asset.kind === 'video'" class="badge dur num">{{ clock(asset.durationMs) }}</span>
@@ -30,7 +31,7 @@ const fits = computed(() => platformSummary(props.asset));
       <button v-if="selectable" type="button" class="peek" aria-label="Details" title="Details" @click.stop="$emit('open')"><Icon name="eye" :size="14" /></button>
     </div>
     <div v-if="!compact" class="meta">
-      <div class="fn ellipsis" :title="asset.path">{{ asset.filename }}</div>
+      <FileName class="fn" :name="asset.filename" :title="asset.path" />
       <div class="fits">
         <span v-for="f in fits" :key="f.platform" class="fit" :class="`l-${f.level}`" :title="fitTitle(f)"><PlatformIcon :platform="f.platform" :size="11" /></span>
         <span v-if="!fits.length" class="tiny faint">no fit data</span>
@@ -47,6 +48,11 @@ const fits = computed(() => platformSummary(props.asset));
 .missing .thumb img { opacity: .4; filter: grayscale(1); }
 .thumb { position: relative; aspect-ratio: 1; background: var(--panel-2); display: grid; place-items: center; overflow: hidden; }
 .thumb img { width: 100%; height: 100%; object-fit: contain; }
+/* the picture's lower edge (the tile's border draws the other three), so a black or white frame never reads as a hole */
+.thumb::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 -1px 0 var(--line); pointer-events: none; }
+.compact .thumb::after { display: none; }
+/* formats that can be transparent sit on a checkerboard */
+.thumb.alpha { background: repeating-conic-gradient(#d9d6cc 0 25%, #f3efe4 0 50%) 0 0 / 14px 14px; }
 .ph { color: var(--faint); }
 /* Fixed ink chips in both themes: they sit on the picture (or the light letterbox), never on the page,
    so they must not follow the theme. Near-opaque so bone text keeps ≥ 12:1 over any frame. */

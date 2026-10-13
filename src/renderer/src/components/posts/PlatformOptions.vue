@@ -86,6 +86,8 @@ const onMeta = () => { if (vid.value) vid.value.currentTime = cover.value / 1000
 </template>
 
 <style scoped>
+/* these grow with v-autosize — no resize grip */
+textarea { resize: none; }
 .counts { display: flex; gap: 14px; margin-top: 6px; color: var(--muted); }
 .over { color: var(--bad); font-weight: 600; }
 .toggles { display: flex; gap: 24px; flex-wrap: wrap; }

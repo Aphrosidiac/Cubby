@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import type { Flow, FlowStep, RecipeInfo } from '@shared/types';
 import PageHeader from '@/components/ui/PageHeader.vue';
+import Sep from '@/components/posts/Sep.vue';
 import Btn from '@/components/ui/Btn.vue';
 import Field from '@/components/ui/Field.vue';
 import Icon from '@/components/ui/Icon.vue';
@@ -196,8 +197,8 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
 
 <template>
   <div class="page flow-editor">
-    <PageHeader eyebrow="Flow" :title="isNew ? 'New flow' : name || flow?.name || 'Flow'" :back="{ to: '/flows', label: 'Flows' }">
-      <span v-if="!loadError && !loading">{{ countSteps(steps) }} {{ countSteps(steps) === 1 ? 'step' : 'steps' }} · {{ schedText }}</span>
+    <PageHeader eyebrow="Library" :title="isNew ? 'New flow' : name || flow?.name || 'Flow'" :back="{ to: '/flows', label: 'Flows' }">
+      <span v-if="!loadError && !loading">{{ countSteps(steps) }} {{ countSteps(steps) === 1 ? 'step' : 'steps' }}<Sep />{{ schedText }}</span>
       <span v-if="flow?.schedule && flow.enabled && flow.nextRunAt && !dirty">next run {{ fmtWhen(flow.nextRunAt) }}</span>
       <span v-if="dirty" class="unsaved"><span class="udot" />Unsaved changes</span>
       <template v-if="!loadError" #actions>
@@ -214,7 +215,7 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
       <Transition name="slide-down">
         <div v-if="recording" class="recbar">
           <div><span class="rdot" /><b>Recording in {{ brandName(recording.brandId) }}</b> — do it once in its window. <span class="num rtime">{{ recElapsed }}</span></div>
-          <Btn variant="signal" size="sm" icon="stop" :loading="recBusy" @click="recStop">Stop and add steps</Btn>
+          <Btn variant="primary" size="sm" icon="stop" class="onink" :loading="recBusy" @click="recStop">Stop and add steps</Btn>
         </div>
       </Transition>
 
@@ -223,18 +224,27 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
           <Field label="Name" :error="show('name')" required for="flow-name">
             <input id="flow-name" v-model="name" class="input" placeholder="e.g. Morning login check" />
           </Field>
-          <Field label="Runs on" :error="show('brands')">
-            <Segmented v-model="scope" size="sm" :options="[{ value: 'one', label: 'One brand' }, { value: 'many', label: 'Several' }, { value: 'any', label: 'Any (pick at run)' }]" />
-          </Field>
+          <div class="runs">
+            <!-- the brand picker sits right under "Runs on", exactly as wide as that switch -->
+            <div class="fitw">
+              <Field label="Runs on">
+                <Segmented v-model="scope" size="sm" :options="[{ value: 'one', label: 'One brand' }, { value: 'many', label: 'Several' }, { value: 'any', label: 'Any (pick at run)' }]" />
+              </Field>
+              <Field v-if="scope === 'one'" label="Brand" :error="show('brands')" class="pick">
+                <BrandPicker v-model="oneBrand" placeholder="Choose the brand…" />
+              </Field>
+            </div>
+            <Field v-if="scope === 'many'" label="Brands" :error="show('brands')">
+              <div class="brandgrid" role="group" aria-label="Brands">
+                <button v-for="b in brands.list" :key="b.id" type="button" class="bchip" :class="{ on: brandIds.includes(b.id) }" :aria-pressed="brandIds.includes(b.id)" @click="toggleBrand(b.id)">
+                  <BrandAvatar :brand="b" :size="18" /><span class="ellipsis">{{ b.name }}</span><Icon v-if="brandIds.includes(b.id)" name="check" :size="13" />
+                </button>
+                <span v-if="!brands.list.length" class="small muted">No brands yet.</span>
+              </div>
+            </Field>
+            <p v-else-if="scope === 'any'" class="tiny muted">You choose the brand each time you run it. Scheduled flows need fixed brands.</p>
+          </div>
         </div>
-        <div v-if="scope === 'one'" class="mt-4 bp"><BrandPicker v-model="oneBrand" placeholder="Choose the brand…" /></div>
-        <div v-else-if="scope === 'many'" class="mt-4 brandgrid">
-          <button v-for="b in brands.list" :key="b.id" type="button" class="bchip" :class="{ on: brandIds.includes(b.id) }" :aria-pressed="brandIds.includes(b.id)" @click="toggleBrand(b.id)">
-            <BrandAvatar :brand="b" :size="18" /><span class="ellipsis">{{ b.name }}</span><Icon v-if="brandIds.includes(b.id)" name="check" :size="13" />
-          </button>
-          <span v-if="!brands.list.length" class="small muted">No brands yet.</span>
-        </div>
-        <p v-else class="tiny muted mt-3">You choose the brand each time you run it. Scheduled flows need fixed brands.</p>
 
         <div class="hr" />
         <div class="schedgrid">
@@ -247,7 +257,7 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
             <label v-else-if="sched === 'custom'" class="inl small grow"><input v-model="cron" class="input code-in" :class="{ invalid: !!schedMsg }" :aria-invalid="!!schedMsg" placeholder="*/30 9-18 * * 1-5" aria-label="Cron expression" spellcheck="false" /></label>
             <span v-if="sched !== 'off' && !schedMsg" class="tiny muted">{{ describeSchedule(schedule) }}</span>
             <span class="grow" />
-            <Toggle v-model="enabled" label="Enabled" :hint="sched === 'off' ? 'No schedule — run it any time' : enabled ? 'Runs on its schedule' : 'Paused — skips its schedule'" />
+            <Toggle v-model="enabled" aria-label="Run this flow on its schedule" :label="!enabled ? 'Paused' : sched === 'off' ? 'On' : 'Runs on schedule'" :hint="sched === 'off' ? 'No schedule — run it any time' : enabled ? 'Turn off to skip its schedule' : 'Skips its schedule until turned on'" />
           </div>
         </div>
         <p v-if="schedMsg" class="tiny err mt-2" role="alert">{{ schedMsg }}</p>
@@ -271,7 +281,7 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
           <div class="recctl">
             <div class="bp2"><BrandPicker v-model="recBrand" placeholder="Brand to record in…" :disabled="!!recording" /></div>
             <Btn v-if="!recording" icon="record" :loading="recBusy" :disabled="!recBrand" @click="recStart">Record</Btn>
-            <Btn v-else variant="signal" icon="stop" :loading="recBusy" @click="recStop">Stop</Btn>
+            <Btn v-else variant="primary" icon="stop" :loading="recBusy" @click="recStop">Stop</Btn>
           </div>
         </div>
       </section>
@@ -287,7 +297,10 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
 .unsaved { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); }
 .udot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px 24px; align-items: start; }
-.bp { width: min(360px, 100%); }
+.runs { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* as wide as the "Runs on" switch: the picker adds no width of its own, then fills the column */
+.fitw { display: grid; gap: 16px; width: max-content; max-width: 100%; }
+.fitw > .pick { width: 0; min-width: 100%; }
 .brandgrid { display: flex; flex-wrap: wrap; gap: 6px; }
 .bchip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 7px; max-width: 220px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); font-size: var(--fs-sm); }
 .bchip:hover { border-color: var(--line-strong); }
@@ -303,6 +316,9 @@ const oneBrand = computed({ get: () => brandIds.value[0] ?? null, set: (v: strin
 .input.invalid { border-color: var(--bad); }
 .input.invalid:focus-visible { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-bg); }
 .recbar { position: sticky; top: calc(var(--topbar) + 8px); z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 16px; margin-bottom: var(--s4); border-radius: var(--r-lg); background: var(--ink); color: var(--bone); box-shadow: var(--shadow-2); font-size: var(--fs-sm); flex-wrap: wrap; }
+/* the bar is Ink in both themes: its button is the inverse (Bone on Ink), not the theme's primary */
+.recbar .btn.onink { background: var(--bone); color: var(--ink); }
+.recbar .btn.onink :deep(.sweep) { background: color-mix(in srgb, var(--ink) 12%, var(--bone)); }
 [data-theme='dark'] .recbar { box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-2); }
 .rtime { color: #a19e94; margin-left: 4px; }
 .rdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #ff5a4f; margin-right: 8px; animation: ff-pulse 1.4s var(--ease-out) infinite; vertical-align: 0; }

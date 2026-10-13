@@ -7,9 +7,10 @@ import type { AccountSummary, FitLevel, MediaAsset, PerPlatformOptions, Platform
 import { POST_KINDS } from '@shared/types';
 import { PLATFORM_SPECS, countHashtags, fitTarget, gradeMedia } from '@shared/platforms';
 import PageHeader from '@/components/ui/PageHeader.vue';
+import Sep from '@/components/posts/Sep.vue';
 import Btn from '@/components/ui/Btn.vue';
 import Icon from '@/components/ui/Icon.vue';
-import Chip from '@/components/ui/Chip.vue';
+import StatusChip from '@/components/posts/StatusChip.vue';
 import Menu from '@/components/ui/Menu.vue';
 import Tabs from '@/components/ui/Tabs.vue';
 import Segmented from '@/components/ui/Segmented.vue';
@@ -274,6 +275,18 @@ const worstFit = computed<FitLevel>(() => (fitRows.value.some(r => r.level === '
 const previewP = ref<Platform | null>(null);
 watch(platforms, ps => { if (!previewP.value || !ps.includes(previewP.value)) previewP.value = ps[0] ?? null; }, { immediate: true });
 const previewAcc = computed(() => selected.value.find(a => a.platform === previewP.value) ?? null);
+/** the time the preview's header shows: when it was posted, or when it is set to go out — "just now" only for Now */
+const previewWhen = computed(() => {
+  const p = editing.value;
+  if (p && readOnly.value) {
+    const r = (p.results ?? []).find(x => x.accountId === previewAcc.value?.id && !x.error);
+    if (r?.at) return ago(r.at);
+    return p.scheduledAt ? fmtWhen(p.scheduledAt, { zone: false }) : 'just now';
+  }
+  if (when.value === 'schedule' && scheduledIso.value) return fmtWhen(scheduledIso.value, { zone: false });
+  if (when.value === 'queue' && nextSlot.value) return fmtWhen(nextSlot.value, { zone: false });
+  return 'just now';
+});
 
 // ── saving ───────────────────────────────────────────────────────────────────
 function cleanPerPlatform(): PerPlatform {
@@ -457,7 +470,7 @@ const leftOutText = computed(() => leftOut.value.map(a => `${a.handle} (${PLATFO
   <div class="page compose">
     <PageHeader eyebrow="Posting" :title="editing ? (readOnly ? 'Post' : 'Edit post') : 'Compose'">
       <template v-if="editing">
-        <Chip :tone="postStatus(editing.status).tone">{{ postStatus(editing.status).label }}</Chip>
+        <StatusChip :status="editing.status" />
         <span v-if="editing.scheduledAt">{{ fmtWhen(editing.scheduledAt) }}</span>
       </template>
       <span v-else>One post, any of the brand’s accounts. Times are {{ tzLabel() }}.</span>
@@ -534,7 +547,7 @@ const leftOutText = computed(() => leftOut.value.map(a => `${a.handle} (${PLATFO
         <aside class="side">
           <div v-if="readOnly && editing" class="panel pad outcome">
             <div class="label mb-3">{{ editing.status === 'running' ? 'Working on it' : editing.status === 'posted' ? 'Posted' : 'Outcome' }}</div>
-            <div class="row gap-2 wrap"><Chip :tone="postStatus(editing.status).tone">{{ postStatus(editing.status).label }}</Chip><span class="small muted">{{ editing.scheduledAt ? fmtWhen(editing.scheduledAt) : 'No time set' }}</span></div>
+            <div class="row gap-2 wrap"><StatusChip :status="editing.status" /><span class="small muted">{{ editing.scheduledAt ? fmtWhen(editing.scheduledAt) : 'No time set' }}</span></div>
             <p v-if="editing.status === 'running'" class="small mt-3">Cubby is working on this post in {{ brand?.name ?? 'the brand' }}’s window right now. The calendar and this page update when it finishes.</p>
             <p v-else-if="editing.status === 'cancelled'" class="small muted mt-3">It was cancelled and will not go out.</p>
             <ul v-if="results.length" class="results mt-3">
@@ -580,15 +593,15 @@ const leftOutText = computed(() => leftOut.value.map(a => `${a.handle} (${PLATFO
               <p v-if="approvalNote" class="appr tiny"><Icon name="approve" :size="13" /><span>{{ brand?.name }} needs approval: the post will be prepared in the brand window and wait in <RouterLink to="/approvals" class="link">Approvals</RouterLink>.</span></p>
             </div>
             <div class="btns">
-              <Btn variant="signal" block :loading="submitting === 'submit'" :disabled="readOnly || !!errors.length || !!scheduleError" :title="errors[0] ?? scheduleError ?? undefined" @click="submit">{{ primaryLabel }}</Btn>
-              <Btn block :loading="submitting === 'draft'" :disabled="readOnly || (!!editing && !isDraftEdit)" @click="saveDraft">{{ isDraftEdit ? 'Save draft' : 'Save as draft' }}</Btn>
+              <Btn variant="primary" block :loading="submitting === 'submit'" :disabled="readOnly || !!errors.length || !!scheduleError" :title="errors[0] ?? scheduleError ?? undefined" @click="submit">{{ primaryLabel }}</Btn>
+              <Btn block :loading="submitting === 'draft'" :disabled="readOnly || (!!editing && !isDraftEdit)" @click="saveDraft">Save draft</Btn>
             </div>
             <ul v-if="errors.length" class="todo tiny">
               <li v-for="e in errors" :key="e"><Icon name="info" :size="12" /><span>{{ e }}</span></li>
             </ul>
             <p v-if="reApproval" class="tiny muted mt-2">Changing the content sends it back for approval; changing only the time keeps the approval.</p>
             <p v-else-if="retrying" class="tiny muted mt-2">{{ approvalNote ? 'Saving prepares it again in the brand window for approval.' : 'Saving puts it back in the queue at the time above; accounts already posted are skipped.' }}</p>
-            <p class="tiny muted keys mt-2"><kbd>Ctrl</kbd> <kbd>Enter</kbd> {{ primaryLabel.toLowerCase() }}<template v-if="!editing || isDraftEdit"> · <kbd>Ctrl</kbd> <kbd>S</kbd> draft</template></p>
+            <p class="tiny muted keys mt-2"><kbd>Ctrl</kbd> <kbd>Enter</kbd> {{ primaryLabel.toLowerCase() }}<template v-if="!editing || isDraftEdit"><Sep /><kbd>Ctrl</kbd> <kbd>S</kbd> draft</template></p>
           </div>
 
           <div v-if="!readOnly" class="panel pad">
@@ -601,7 +614,7 @@ const leftOutText = computed(() => leftOut.value.map(a => `${a.handle} (${PLATFO
                 <button v-for="p in platforms" :key="p" type="button" :class="{ on: p === previewP }" :aria-label="PLATFORM_SPECS[p].name" :title="PLATFORM_SPECS[p].name" @click="previewP = p"><PlatformIcon :platform="p" :size="14" /></button>
               </div>
             </div>
-            <PreviewCard v-if="previewP && previewAcc" :platform="previewP" :kind="kind" :handle="previewAcc.handle" :brand="brand" :caption="effCaption(previewP)" :title="perPlatform[previewP]?.title" :assets="assets" />
+            <PreviewCard v-if="previewP && previewAcc" :platform="previewP" :kind="kind" :handle="previewAcc.handle" :brand="brand" :caption="effCaption(previewP)" :title="perPlatform[previewP]?.title" :assets="assets" :when="previewWhen" />
             <p v-else class="small muted">Choose an account to see a preview.</p>
           </div>
         </aside>
@@ -644,13 +657,13 @@ const leftOutText = computed(() => leftOut.value.map(a => `${a.handle} (${PLATFO
 .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-size: var(--fs-2xs); background: var(--fg); color: var(--bg); flex: none; }
 .brandrow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .bp { width: min(360px, 100%); }
-.cap { min-height: 120px; font-size: var(--fs-md); }
+.cap { min-height: 120px; font-size: var(--fs-md); resize: none; } /* grows with v-autosize — no grip */
 .counters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ctr { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 99px; background: var(--panel-2); font-size: var(--fs-xs); color: var(--fg-2); }
 .ctr.over { background: var(--bad-bg); color: var(--bad); }
 .ov { font-family: var(--mono); font-size: var(--fs-2xs); text-transform: uppercase; color: var(--muted); }
 .tabbody { padding-top: var(--s4); }
-.actions .whenbody { margin-top: 14px; min-height: 64px; display: flex; flex-direction: column; gap: 8px; }
+.actions .whenbody { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .dt { display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); gap: 6px; align-items: center; } /* date + time side by side when both fit whole, else stacked */
 .dt .input { min-height: 38px; padding: 7px 9px; }
 .tz { color: var(--muted); }

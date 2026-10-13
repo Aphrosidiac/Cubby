@@ -61,7 +61,7 @@ function key(i: number, e: KeyboardEvent) {
 <template>
   <div class="ms" :class="{ over, disabled }" @dragenter.prevent="enter" @dragover.prevent="overZone" @dragleave="leave" @drop.prevent="dropFiles">
     <div v-if="assets.length" class="thumbs">
-      <div v-for="(a, i) in assets" :key="a.id" class="th" :class="{ dragging: dragFrom === i, target: dragOver === i && dragFrom !== i }" tabindex="0"
+      <div v-for="(a, i) in assets" :key="a.id" class="th" :class="{ dragging: dragFrom === i, target: dragOver === i && dragFrom !== i, alpha: !!a.thumb && /.(png|webp|gif|svg|avif)$/i.test(a.thumb) }" tabindex="0"
         :draggable="!disabled && multi && assets.length > 1" :title="a.filename" :aria-label="`${i + 1}. ${a.filename}${disabled ? '' : multi && assets.length > 1 ? ' — Shift+←/→ to move, Delete to remove, double-click to preview' : ' — Delete to remove, double-click to preview'}`"
         @dragstart="startDrag(i, $event)" @dragend="dragFrom = dragOver = null" @dragenter.prevent="dragOver = i" @dragover.prevent="overZone" @drop.prevent.stop="dropOn(i, $event)" @keydown="key(i, $event)" @dblclick="emit('open', a)">
         <img v-if="a.thumb" :src="fileUrl(a.thumb)" alt="" draggable="false" />
@@ -97,7 +97,8 @@ function key(i: number, e: KeyboardEvent) {
 .th { position: relative; width: 92px; height: 92px; border-radius: 6px; overflow: hidden; background: var(--panel-2); display: grid; place-items: center; flex: none; cursor: grab; transition: transform 200ms var(--ease-out), box-shadow 200ms, opacity 200ms; }
 .th img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 /* a hairline over the picture so very dark or very light media keep their edge on either theme */
-.th:not(.add)::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgb(127 127 120 / .28); pointer-events: none; }
+.th:not(.add)::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; }
+.th.alpha { background: repeating-conic-gradient(#d9d6cc 0 25%, #f3efe4 0 50%) 0 0 / 14px 14px; }
 .th.dragging { opacity: .4; }
 .th.target { box-shadow: -4px 0 0 var(--lime), -5px 0 0 var(--ink); }
 .th:focus-visible { outline-offset: 2px; }

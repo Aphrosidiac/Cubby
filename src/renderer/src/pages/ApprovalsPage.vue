@@ -69,11 +69,11 @@ async function approveSelected() {
 <template>
   <div class="page approvals">
     <PageHeader eyebrow="Posting" title="Approvals">
-      <span v-if="data">{{ data.length ? `${data.length} ${data.length === 1 ? 'post' : 'posts'} waiting` : 'Inbox clear' }}</span>
-      <span v-if="data?.length" class="muted">Each was filled in its brand’s window and stopped before the final button.</span>
+      <span v-if="data" class="meta num">{{ data.length ? `${data.length} ${data.length === 1 ? 'post' : 'posts'} waiting` : 'Inbox clear' }}</span>
+      <span v-if="data?.length" class="desc">Each was filled in its brand’s window and stopped before the final button.</span>
       <template #actions>
-        <Btn v-if="data?.length" variant="ghost" @click="selected = selected.length === data.length ? [] : data.map(p => p.id)">{{ selected.length === data.length ? 'Clear selection' : 'Select all' }}</Btn>
-        <Btn v-if="selected.length" variant="signal" icon="check" :loading="batching" @click="approveSelected">Approve {{ selected.length }}</Btn>
+        <Btn v-if="data?.length" size="sm" variant="subtle" @click="selected = selected.length === data.length ? [] : data.map(p => p.id)">{{ selected.length === data.length ? 'Clear selection' : 'Select all' }}</Btn>
+        <Btn v-if="selected.length" variant="primary" icon="check" :loading="batching" @click="approveSelected">Approve {{ selected.length }}</Btn>
       </template>
     </PageHeader>
 
@@ -87,7 +87,7 @@ async function approveSelected() {
       <section v-for="g in groups" :key="g.brandId" class="grp">
         <div class="section-title">
           <div class="row gap-2 minw"><BrandAvatar :brand="g.brand ?? { name: '?' }" :size="22" /><h2 class="h3 ellipsis" :title="g.brand?.name">{{ g.brand?.name ?? 'Unknown brand' }}</h2><span class="tiny muted num">{{ g.posts.length }}</span></div>
-          <button type="button" class="small link muted" :aria-label="`${groupAll(g.posts) ? 'Unselect' : 'Select'} every post for ${g.brand?.name ?? 'this brand'}`" @click="toggleGroup(g.posts)">{{ groupAll(g.posts) ? 'Unselect these' : 'Select these' }}</button>
+          <Btn size="sm" variant="subtle" :aria-label="`${groupAll(g.posts) ? 'Unselect' : 'Select'} every post for ${g.brand?.name ?? 'this brand'}`" @click="toggleGroup(g.posts)">{{ groupAll(g.posts) ? 'Unselect these' : 'Select these' }}</Btn>
         </div>
         <TransitionGroup tag="div" name="list" class="cards">
           <ApprovalCard v-for="p in g.posts" :key="p.id" :post="p" :media="media" :selected="selected.includes(p.id)" @update:selected="v => setSel(p.id, v)" @picked="ids => setPicks(p, ids)" @done="reload(true)" />
@@ -100,5 +100,12 @@ async function approveSelected() {
 <style scoped>
 .groups { display: flex; flex-direction: column; gap: var(--s7); }
 .cards { display: flex; flex-direction: column; gap: var(--s4); }
+/* on a wide window the cards stop growing: past this the caption and screenshots only drift apart */
+.cards { max-width: 1200px; }
 .minw { min-width: 0; }
+/* the count and the explanation are two lines, never run together */
+.desc { flex-basis: 100%; text-wrap: pretty; }
+/* the select controls are text-weight buttons: their label lines up with the right edge */
+.section-title :deep(.btn) { margin: -6px -13px -6px 0; }
+.approvals :deep(.page-header .actions > .v-subtle:last-child) { margin-right: -13px; }
 </style>

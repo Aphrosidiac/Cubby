@@ -13,7 +13,7 @@ import type { CalendarOptions, EventDropArg, EventInput, EventClickArg, DatesSet
 import type { Post, PostStatus } from '@shared/types';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import Btn from '@/components/ui/Btn.vue';
-import Chip from '@/components/ui/Chip.vue';
+import StatusChip from '@/components/posts/StatusChip.vue';
 import Icon from '@/components/ui/Icon.vue';
 import Select from '@/components/ui/Select.vue';
 import Segmented from '@/components/ui/Segmented.vue';
@@ -229,14 +229,16 @@ const viewOptions = [{ value: 'dayGridMonth', label: 'Month' }, { value: 'timeGr
             <span class="small muted nowrap">{{ KIND_LABEL[d.kind] }}</span>
             <span class="grow small ellipsis" :title="d.caption">{{ d.caption || 'No caption' }}</span>
             <span v-if="d.status === 'ready_for_approval' || d.status === 'approved'" class="tiny muted nowrap">As soon as approved</span>
-            <Chip size="sm" :tone="postStatus(d.status).tone">{{ postStatus(d.status).label }}</Chip>
+            <StatusChip size="sm" :status="d.status" />
             <Icon name="arrow" :size="14" class="go" />
           </button>
         </li>
       </ul>
     </section>
 
-    <div class="legend tiny muted" aria-label="Status key">
+    <div class="legend tiny muted" aria-label="Key">
+      <span class="lg"><span class="lbar" aria-hidden="true" />Brand colour</span>
+      <span class="lsep" aria-hidden="true" />
       <span v-for="(s, k) in POST_STATUS" :key="k" class="lg"><span class="sd" :class="`st-${k}`"><i class="dot" /></span>{{ s.label }}</span>
     </div>
 
@@ -275,10 +277,11 @@ const viewOptions = [{ value: 'dayGridMonth', label: 'Month' }, { value: 'timeGr
 .v-listMonth .ev .bar { width: 3px; border-radius: 2px; }
 .sd { flex: none; display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: var(--fs-2xs); font-family: var(--mono); text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
 .sl { white-space: nowrap; }
-/* status key: hollow = still to come · filled = done · lime = waiting for you to approve · bullseye = needs you */
+/* status key: hollow = still to come · filled = done · ink ring with a lime centre = waiting for you to approve · bullseye = needs you */
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; box-sizing: border-box; }
 .st-draft .dot { box-shadow: inset 0 0 0 1.5px var(--muted); }
-.st-ready_for_approval .dot { background: var(--lime); box-shadow: 0 0 0 1px var(--ink); }
+/* an Ink ring round the lime centre, with a hairline of Bone outside it: the ring reads on pale chips, the hairline keeps it on dark panels */
+.st-ready_for_approval .dot { background: var(--lime); box-shadow: inset 0 0 0 2px var(--ink), 0 0 0 1px var(--bone); }
 .st-ready_for_approval { color: var(--fg); }
 .st-approved .dot { box-shadow: inset 0 0 0 1.5px var(--good); }
 .st-approved { color: var(--good); }
@@ -305,6 +308,8 @@ const viewOptions = [{ value: 'dayGridMonth', label: 'Month' }, { value: 'timeGr
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: var(--s5); }
 .lg { display: inline-flex; align-items: center; gap: 6px; }
 .lg .sd { margin: 0; }
+.lbar { width: 3px; height: 12px; border-radius: 2px; background: var(--fg-2); flex: none; }
+.lsep { width: 1px; height: 12px; background: var(--line); align-self: center; }
 </style>
 
 <style>
@@ -314,9 +319,9 @@ const viewOptions = [{ value: 'dayGridMonth', label: 'Month' }, { value: 'timeGr
   --fc-page-bg-color: var(--panel);
   --fc-neutral-bg-color: var(--panel-2);
   --fc-neutral-text-color: var(--muted);
-  --fc-today-bg-color: color-mix(in srgb, var(--lime) 11%, transparent);
+  --fc-today-bg-color: color-mix(in srgb, var(--fg) 3%, transparent); /* neutral: today is marked by the Ink day badge */
   --fc-now-indicator-color: var(--bad);
-  --fc-highlight-color: color-mix(in srgb, var(--lime) 22%, transparent);
+  --fc-highlight-color: color-mix(in srgb, var(--fg) 8%, transparent);
   --fc-event-bg-color: transparent;
   --fc-event-border-color: transparent;
   --fc-event-text-color: var(--fg);
@@ -329,7 +334,6 @@ const viewOptions = [{ value: 'dayGridMonth', label: 'Month' }, { value: 'timeGr
   font-size: var(--fs-sm);
   color: var(--fg);
 }
-:root[data-theme='dark'] .cal-wrap .fc { --fc-today-bg-color: color-mix(in srgb, var(--lime) 5%, transparent); }
 .cal-wrap .fc .fc-scrollgrid { border-radius: var(--r-lg); overflow: hidden; background: var(--panel); }
 .cal-wrap .fc .fc-col-header-cell { background: var(--bg-elev); }
 .cal-wrap .fc .fc-col-header-cell-cushion { padding: 8px 6px; font-family: var(--mono); font-size: var(--fs-2xs); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }

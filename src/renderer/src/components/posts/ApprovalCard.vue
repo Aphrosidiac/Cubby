@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import type { MediaAsset, Platform, Post } from '@shared/types';
 import { PLATFORM_SPECS } from '@shared/platforms';
 import Btn from '@/components/ui/Btn.vue';
+import Sep from './Sep.vue';
 import Icon from '@/components/ui/Icon.vue';
 import PlatformIcon from '@/components/common/PlatformIcon.vue';
 import ImageZoom from '@/components/media/ImageZoom.vue';
@@ -70,7 +71,7 @@ async function reject() {
 </script>
 
 <template>
-  <article class="card" :class="{ sel: selected }">
+  <article class="card" :class="{ sel: selected }" :style="{ '--n': Math.min(accounts.length, 3) }">
     <header class="ch">
       <label class="cb"><input type="checkbox" :checked="selected" :aria-label="`Select post for ${brand?.name}`" @change="emit('update:selected', ($event.target as HTMLInputElement).checked)" /></label>
       <div class="grow">
@@ -78,12 +79,12 @@ async function reject() {
           <span class="strong" :title="post.scheduledAt ? 'Goes out at this time once approved' : 'No time set — goes out as soon as it is approved and pacing allows'">{{ post.scheduledAt ? fmtWhen(post.scheduledAt) : 'As soon as approved' }}</span>
           <span class="kind mono">{{ KIND_LABEL[post.kind] }}</span>
         </div>
-        <div class="tiny muted">{{ accounts.length }} {{ accounts.length === 1 ? 'account' : 'accounts' }} · prepared {{ ago(post.updatedAt) }}</div>
+        <div class="tiny muted">{{ accounts.length }} {{ accounts.length === 1 ? 'account' : 'accounts' }}<Sep />prepared {{ ago(post.updatedAt) }}</div>
       </div>
       <div class="acts">
         <Btn size="sm" variant="subtle" :loading="busy === 'reject'" @click="reject">Reject</Btn>
         <Btn size="sm" icon="edit" @click="router.push({ path: '/compose', query: { post: post.id } })">Edit</Btn>
-        <Btn size="sm" variant="signal" icon="check" :loading="busy === 'all'" :disabled="!picked.length" @click="approve()">{{ !picked.length ? 'Pick an account' : partial ? `Approve ${picked.length} of ${post.accountIds.length}` : 'Approve all' }}</Btn>
+        <Btn size="sm" variant="primary" icon="check" :loading="busy === 'all'" :disabled="!picked.length" @click="approve()">{{ !picked.length ? 'Pick an account' : partial ? `Approve ${picked.length} of ${post.accountIds.length}` : post.accountIds.length === 1 ? 'Approve' : 'Approve all' }}</Btn>
       </div>
     </header>
 
@@ -131,16 +132,21 @@ async function reject() {
 .kind { padding: 2px 7px; border-radius: 4px; background: var(--panel-2); color: var(--fg-2); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .04em; }
 .acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px; }
-@container (min-width: 720px) { .body { grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr); } }
+/* wide cards: the screenshots column is only as wide as its screenshots need (up to 300px each, 3 a row),
+   so a one- or two-account post never leaves an empty block beside them; the caption takes the rest */
+@container (min-width: 720px) { .body { grid-template-columns: minmax(260px, 1fr) minmax(0, min(64%, calc(var(--n) * 300px + (var(--n) - 1) * 10px))); } }
+.content { min-width: 0; }
+.content .cap { max-width: 72ch; }
 .cap { line-height: 1.5; color: var(--fg-2); overflow-wrap: anywhere; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
 .more { color: var(--muted); margin-top: 4px; } .more:hover { color: var(--fg); }
 .ovr { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .ovr .cap { margin-top: 4px; }
 .media { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
-.media img { width: 56px; height: 56px; border-radius: 4px; object-fit: cover; background: var(--panel-2); }
+.media img { width: 56px; height: 56px; border-radius: 4px; object-fit: cover; background: var(--panel-2); outline: 1px solid var(--line); outline-offset: -1px; }
 .morem { font-size: var(--fs-xs); color: var(--muted); }
-.screens { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; }
+.screens { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; align-content: start; }
+@container (min-width: 720px) { .screens { grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); } }
 .scr { border: 1px solid var(--line-soft); border-radius: 6px; overflow: hidden; background: var(--bg-elev); }
 .scr.off { opacity: .55; }
 .scr.off .shot img { filter: grayscale(1); }

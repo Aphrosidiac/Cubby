@@ -6,9 +6,10 @@ import Icon from '@/components/ui/Icon.vue';
 import PlatformIcon from '@/components/common/PlatformIcon.vue';
 import { fileUrl } from '@/lib/api';
 import { initials } from '@/lib/format';
+import Sep from './Sep.vue';
 
 /** A rough mock of how the post reads on one platform — first media + caption, not a pixel copy. */
-const props = defineProps<{ platform: Platform; kind: PostKind; handle: string; brand: { name: string; color?: string; logo?: string | null } | null; caption: string; title?: string; assets: MediaAsset[] }>();
+const props = defineProps<{ platform: Platform; kind: PostKind; handle: string; brand: { name: string; color?: string; logo?: string | null } | null; caption: string; title?: string; assets: MediaAsset[]; when?: string }>();
 const spec = computed(() => PLATFORM_SPECS[props.platform]);
 const vertical = computed(() => ['reel', 'story'].includes(props.kind) || props.platform === 'tiktok' || (props.platform === 'youtube' && props.kind === 'reel'));
 const first = computed(() => props.assets[0] ?? null);
@@ -25,7 +26,7 @@ const h = computed(() => (props.handle.startsWith('@') ? props.handle.slice(1) :
   <div class="pv" :class="[{ vertical }, `p-${platform}`]">
     <div v-if="!vertical" class="top">
       <span class="av" :style="{ background: brand?.logo ? undefined : brand?.color }"><img v-if="brand?.logo" :src="brand.logo" alt="" /><template v-else>{{ initials(brand?.name) }}</template></span>
-      <div class="grow"><div class="nm ellipsis">{{ h || brand?.name || 'account' }}</div><div class="sub">{{ spec.name }} · just now</div></div>
+      <div class="grow"><div class="nm ellipsis">{{ h || brand?.name || 'account' }}</div><div class="sub ellipsis">{{ spec.name }}<Sep />{{ when || 'just now' }}</div></div>
       <PlatformIcon :platform="platform" :size="15" colored />
     </div>
     <p v-if="!vertical && (platform === 'x' || platform === 'threads' || platform === 'linkedin' || kind === 'text')" class="cap pre">{{ clip || 'Your caption shows here.' }}</p>
@@ -59,6 +60,8 @@ const h = computed(() => (props.handle.startsWith('@') ? props.handle.slice(1) :
 .p-instagram .media { aspect-ratio: 4 / 5; }
 .vertical .media { aspect-ratio: 9 / 16; max-height: 420px; margin: 0 auto; }
 .media img { width: 100%; height: 100%; object-fit: cover; }
+/* a hairline over the picture so a black (or white) image never reads as a hole in the card */
+.media::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; z-index: 1; }
 .ph { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #a19e94; }
 .multi { position: absolute; top: 8px; right: 8px; padding: 1px 7px; border-radius: 9px; background: rgb(11 11 10 / .7); color: #fff; font-size: var(--fs-2xs); }
 .play { position: absolute; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgb(11 11 10 / .6); color: #fff; }
