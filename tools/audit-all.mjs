@@ -2,6 +2,7 @@
 //   node tools/audit-all.mjs --port <cdp> --data <seed dir> --out <dir> [--sizes 980x620,1380x880,1920x1080] [--themes light,dark]
 // Writes <out>/<theme>/<size>/<route>.png and <out>/report.json; prints issues that are not known probe
 // false positives (Segmented highlight, labelled switches, floating menus, sr-only text).
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
@@ -37,23 +38,32 @@ const errors = []
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 page.on('pageerror', (e) => errors.push(String(e)))
 // Resize the REAL window (not viewport emulation): the Windows caption-button area (env(titlebar-area-*))
-// is only correct for the window's true size. Content size = window size minus the frame Electron adds.
-const cdp = await browser.newBrowserCDPSession()
-const { targetInfos } = await cdp.send('Target.getTargets')
-const target = targetInfos.find((t) => t.type === 'page' && t.url.includes('#/') && !t.url.includes('switcher'))
-const { windowId } = await cdp.send('Browser.getWindowForTarget', { targetId: target.targetId })
+// is only correct for the window's true size. Electron has no CDP window commands, so on Windows this
+// moves the app's top-level window with the Win32 API (like dragging its edge); elsewhere it falls back
+// to viewport emulation.
+const PORT = arg('port', 9700)
+function resizeNative(w, h) {
+  const ps = `$p = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '--remote-debugging-port=${PORT}' -and $_.CommandLine -notmatch '--type=' } | Select-Object -First 1
+$h = (Get-Process -Id $p.ProcessId).MainWindowHandle
+Add-Type -Namespace W -Name U -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool MoveWindow(System.IntPtr h, int x, int y, int w, int hh, bool r); [DllImport(\"user32.dll\")] public static extern bool ShowWindow(System.IntPtr h, int c);'
+[W.U]::ShowWindow($h, 9) | Out-Null
+[W.U]::MoveWindow($h, 0, 0, ${w}, ${h}, $true) | Out-Null`
+  execFileSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'ignore' })
+}
 async function resizeWindow(w, h) {
-  await cdp.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } })
+  if (process.platform !== 'win32') return page.setViewportSize({ width: w, height: h })
   let bw = w
   let bh = h
   for (let i = 0; i < 3; i++) {
-    await cdp.send('Browser.setWindowBounds', { windowId, bounds: { left: 0, top: 0, width: bw, height: bh } })
-    await page.waitForTimeout(250)
+    resizeNative(bw, bh)
+    await page.waitForTimeout(350)
     const vp = await page.evaluate(() => [window.innerWidth, window.innerHeight])
-    if (vp[0] === w && vp[1] === h) break
+    if (vp[0] === w && vp[1] === h) return
     bw += w - vp[0]
     bh += h - vp[1]
   }
+  const vp = await page.evaluate(() => [window.innerWidth, window.innerHeight])
+  console.warn(`window is ${vp[0]}x${vp[1]} (wanted ${w}x${h})`)
 }
 const report = []
 for (const theme of themes) {
