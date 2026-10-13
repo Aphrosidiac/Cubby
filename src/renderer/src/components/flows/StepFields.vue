@@ -127,6 +127,8 @@ const KEYS = ['Enter', 'Tab', 'Escape', 'Backspace', 'ArrowDown', 'ArrowUp', 'Sp
 </template>
 
 <style scoped>
+/* these grow with v-autosize — no resize grip */
+textarea { resize: none; }
 .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: start; }
 .code-in { font-family: var(--mono); font-size: var(--fs-xs); }
 .narrow { max-width: 160px; }

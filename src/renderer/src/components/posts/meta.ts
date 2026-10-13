@@ -8,7 +8,7 @@ import { isDark } from '@/lib/store';
 
 export const POST_STATUS: Record<PostStatus, { label: string; tone: string }> = {
   draft: { label: 'Draft', tone: 'muted' },
-  ready_for_approval: { label: 'Awaiting approval', tone: 'signal' },
+  ready_for_approval: { label: 'Awaiting approval', tone: 'ink' },
   approved: { label: 'Approved', tone: 'good' },
   queued: { label: 'Queued', tone: 'info' },
   running: { label: 'Running', tone: 'warn' },
@@ -17,10 +17,13 @@ export const POST_STATUS: Record<PostStatus, { label: string; tone: string }> = 
   failed: { label: 'Failed', tone: 'bad' },
   cancelled: { label: 'Cancelled', tone: 'muted' }
 };
+/** Statuses that are in progress right now: their chip's dot pulses (StatusChip). */
+export const LIVE_STATUS = new Set(['running']);
+
 export const postStatus = (s: string) => POST_STATUS[s as PostStatus] ?? { label: s, tone: 'neutral' };
 
 export const RUN_STATUS: Record<RunStatus, { label: string; tone: string }> = {
-  running: { label: 'Running', tone: 'signal' },
+  running: { label: 'Running', tone: 'warn' },
   ok: { label: 'Done', tone: 'good' },
   failed: { label: 'Failed', tone: 'bad' },
   aborted: { label: 'Aborted', tone: 'muted' },

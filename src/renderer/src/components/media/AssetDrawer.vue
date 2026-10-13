@@ -6,6 +6,7 @@ import { FIT_TARGETS } from '@shared/platforms';
 import Drawer from '@/components/ui/Drawer.vue';
 import Btn from '@/components/ui/Btn.vue';
 import Chip from '@/components/ui/Chip.vue';
+import StatusChip from '@/components/posts/StatusChip.vue';
 import Icon from '@/components/ui/Icon.vue';
 import PlatformIcon from '@/components/common/PlatformIcon.vue';
 import { api, fileUrl } from '@/lib/api';
@@ -13,7 +14,7 @@ import { bytes, dateTime } from '@/lib/format';
 import { fail, ok } from '@/composables/toast';
 import { confirm } from '@/composables/confirm';
 import { clock, fmtWhen } from '@/components/posts/time';
-import { brandName, postStatus } from '@/components/posts/meta';
+import { brandName } from '@/components/posts/meta';
 import { aspectLabel } from './fit';
 
 /** Everything about one library file: preview, facts, tags, fit per target, where it is used. */
@@ -81,7 +82,7 @@ async function remove() {
     <template v-if="asset">
       <div class="preview">
         <video v-if="asset.kind === 'video' && !previewErr && !asset.missing" :key="asset.id" controls preload="metadata" :src="fileUrl(asset.path)" :poster="asset.thumb ? fileUrl(asset.thumb) : undefined" @error="previewErr = true" />
-        <img v-else-if="asset.kind === 'image' && !previewErr && !asset.missing" :src="fileUrl(asset.path)" alt="" @error="previewErr = true" />
+        <img v-else-if="asset.kind === 'image' && !previewErr && !asset.missing" :src="fileUrl(asset.path)" alt="" :class="{ alpha: /\.(png|webp|gif|svg|avif)$/i.test(asset.filename) }" @error="previewErr = true" />
         <div v-else class="noprev"><Icon name="warn" :size="18" /><span class="small">{{ asset.missing ? 'The file is missing from disk.' : 'Preview not available for this file.' }}</span></div>
       </div>
       <div v-if="asset.missing" class="warnline small"><Icon name="warn" :size="14" />The file was moved or deleted. Put it back or remove it from the library.</div>
@@ -126,7 +127,7 @@ async function remove() {
             <button type="button" class="use" @click="router.push({ path: '/compose', query: { post: p.id } })">
               <span class="grow ellipsis">{{ brandName(p.brandId) }} · {{ p.caption || 'No caption' }}</span>
               <span class="tiny muted nowrap">{{ fmtWhen(p.scheduledAt, { zone: false }) }}</span>
-              <Chip size="sm" :tone="postStatus(p.status).tone">{{ postStatus(p.status).label }}</Chip>
+              <StatusChip size="sm" :status="p.status" />
             </button>
           </li>
         </ul>
@@ -143,7 +144,11 @@ async function remove() {
 
 <style scoped>
 .preview { border-radius: var(--r-lg); background: #0b0b0a; overflow: hidden; display: grid; place-items: center; min-height: 200px; }
-.preview video, .preview img { width: 100%; max-height: 52vh; object-fit: contain; display: block; }
+.preview video { width: 100%; max-height: 52vh; object-fit: contain; display: block; }
+/* the image box hugs the picture: a 1px edge so a black (or white) image never reads as a hole, and
+   formats that can be transparent sit on a checkerboard */
+.preview img { display: block; width: auto; height: auto; max-width: 100%; max-height: 52vh; outline: 1px solid var(--line); outline-offset: -1px; }
+.preview img.alpha { background: repeating-conic-gradient(#d9d6cc 0 25%, #f3efe4 0 50%) 0 0 / 16px 16px; }
 .noprev { display: flex; align-items: center; gap: 8px; color: #a19e94; padding: 40px 16px; }
 .warnline { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--bad); }
 .path { font-size: var(--fs-2xs); text-align: right; word-break: break-all; font-weight: 400; color: var(--fg-2); }

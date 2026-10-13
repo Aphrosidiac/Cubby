@@ -38,9 +38,10 @@ const on = (id: string) => props.modelValue.includes(id) && !props.unavailable?.
 .ac:hover:not(:disabled):not(.na) { border-color: var(--line-strong); color: var(--fg); }
 .ac:active:not(:disabled):not(.na) { background: var(--panel-hover); }
 .ac.on { border-color: var(--fg); color: var(--fg); background: var(--bg-elev); }
-.ac:disabled { opacity: .55; cursor: not-allowed; }
+.ac:disabled:not(.na) { opacity: .55; cursor: not-allowed; }
 .ac.na { border-style: dashed; color: var(--muted); background: transparent; cursor: not-allowed; }
-.ac.na .h { text-decoration: line-through; text-decoration-color: var(--line-strong); }
+/* left out (the platform can't take this kind): the same struck-through, dashed pill in every status — editable or not */
+.ac.na .h { text-decoration: line-through; text-decoration-color: var(--muted); }
 .ac.na :deep(.pi), .ac.na .box { opacity: .55; }
 .box { width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px var(--line-strong); transition: background-color 160ms, box-shadow 160ms; flex: none; }
 .on .box { background: var(--fg); color: var(--bg); box-shadow: none; }

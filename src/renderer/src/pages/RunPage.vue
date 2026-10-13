@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router';
 import type { FlowRun, FlowStep, RunLogEntry } from '@shared/types';
 import PageHeader from '@/components/ui/PageHeader.vue';
 import Btn from '@/components/ui/Btn.vue';
-import Chip from '@/components/ui/Chip.vue';
+import StatusChip from '@/components/posts/StatusChip.vue';
 import Icon from '@/components/ui/Icon.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import ActorChip from '@/components/activity/ActorChip.vue';
@@ -14,7 +14,7 @@ import ImageZoom from '@/components/media/ImageZoom.vue';
 import { STEP_META } from '@/components/flows/steps';
 import PostDrawer from '@/components/posts/PostDrawer.vue';
 import BrandAvatar from '@/components/common/BrandAvatar.vue';
-import { brandById, runStatus, useBrands } from '@/components/posts/meta';
+import { brandById, useBrands } from '@/components/posts/meta';
 import { duration, fmtStamp, fmtWhen } from '@/components/posts/time';
 import { api, fileUrl, on } from '@/lib/api';
 import { onTopics } from '@/lib/live';
@@ -82,7 +82,6 @@ watch(() => run.value?.flowId, async fid => {
 }, { immediate: true });
 const stepName = (s: string) => stepNames.value.get(s) ?? s;
 const brand = computed(() => brandById(run.value?.brandId));
-const st = computed(() => runStatus(run.value?.status ?? 'running'));
 const took = computed(() => run.value ? duration((run.value.endedAt ? new Date(run.value.endedAt).getTime() : now.value) - new Date(run.value.startedAt).getTime()) : '—');
 const screens = computed(() => {
   const fromLog = log.value.filter(e => e.screen).map(e => ({ path: e.screen!, label: e.step ? `${stepName(e.step)} · ${fmtStamp(e.at)}` : fmtStamp(e.at) }));
@@ -105,9 +104,9 @@ const copyLog = async () => { try { await navigator.clipboard.writeText(log.valu
 
 <template>
   <div class="page run">
-    <PageHeader eyebrow="Run" :title="run?.label ?? 'Run'" :back="{ to: '/flows?tab=runs', label: 'Runs' }">
+    <PageHeader eyebrow="Library" :title="run?.label ?? 'Run'" :back="{ to: '/flows?tab=runs', label: 'Runs' }">
       <template v-if="run">
-        <Chip :tone="st.tone">{{ st.label }}</Chip>
+        <StatusChip of="run" :status="run.status" />
         <span class="row gap-2"><BrandAvatar :brand="brand ?? { name: '?' }" :size="18" />{{ brand?.name ?? 'Unknown brand' }}</span>
         <ActorChip :actor="run.actor" />
         <span class="num">{{ took }}</span>

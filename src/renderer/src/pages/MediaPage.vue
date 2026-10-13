@@ -12,6 +12,8 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import PlatformIcon from '@/components/common/PlatformIcon.vue';
 import MediaTile from '@/components/media/MediaTile.vue';
 import AssetDrawer from '@/components/media/AssetDrawer.vue';
+import FileName from '@/components/media/FileName.vue';
+import Sep from '@/components/posts/Sep.vue';
 import WatchFoldersDrawer from '@/components/media/WatchFoldersDrawer.vue';
 import { MEDIA_EXT, aspectLabel, droppedPaths, fitTitle, isFileDrag, platformSummary } from '@/components/media/fit';
 import { clock } from '@/components/posts/time';
@@ -85,6 +87,7 @@ function onRemoved(id: string) {
   if (data.value) data.value = data.value.filter(x => x.id !== id);
 }
 
+const VIEWS = [{ value: 'grid', icon: 'grid', label: 'Grid view' }, { value: 'list', icon: 'rows', label: 'List view' }] as const;
 const columns: Column[] = [
   { key: 'filename', label: 'File', sortable: true, class: 'c-fill' },
   { key: 'kind', label: 'Type', width: '84px', sortable: true, class: 'c-wide' },
@@ -99,8 +102,8 @@ const columns: Column[] = [
 <template>
   <div class="page media" @dragenter.prevent="enter" @dragover.prevent @dragleave="leave" @drop.prevent="drop">
     <PageHeader eyebrow="Library" title="Media">
-      <span v-if="data" class="num">{{ data.length }} {{ data.length === 1 ? 'file' : 'files' }}{{ filtered ? (data.length === 1 ? ' matches' : ' match') : '' }}<template v-if="missingCount"> · <span class="missn">{{ missingCount }} missing</span></template></span>
-      <span>Files stay where they are — the library only indexes them.</span>
+      <span v-if="data" class="num">{{ data.length }} {{ data.length === 1 ? 'file' : 'files' }}{{ filtered ? (data.length === 1 ? ' matches' : ' match') : '' }}<template v-if="missingCount"><Sep /><span class="missn">{{ missingCount }} missing</span></template></span>
+      <span class="desc">Files stay where they are — the library only indexes them.</span>
       <template #actions>
         <Btn icon="folder" @click="foldersOpen = true">Watch folders</Btn>
         <Btn variant="primary" icon="plus" :loading="adding > 0" @click="pick">Add files</Btn>
@@ -112,7 +115,9 @@ const columns: Column[] = [
       <Select v-model="tag" variant="pill" :options="tagOptions" aria-label="Filter by tag" :min-width="180" />
       <Segmented v-model="kind" size="sm" :options="[{ value: 'all', label: 'All' }, { value: 'video', label: 'Video', icon: 'video' }, { value: 'image', label: 'Image', icon: 'image' }]" />
       <span class="grow" />
-      <Segmented v-model="view" size="sm" :options="[{ value: 'grid', label: 'Grid', icon: 'grid' }, { value: 'list', label: 'List', icon: 'rows' }]" aria-label="View" />
+      <div class="vt" role="group" aria-label="View">
+        <button v-for="o in VIEWS" :key="o.value" type="button" :aria-pressed="view === o.value" :aria-label="o.label" :title="o.label" @click="view = o.value"><Icon :name="o.icon" :size="15" /></button>
+      </div>
     </div>
 
     <Transition name="fade">
@@ -144,7 +149,7 @@ const columns: Column[] = [
           <img v-if="row.thumb" :src="fileUrl(row.thumb)" alt="" class="mini" :class="{ gone: row.missing }" loading="lazy" />
           <span v-else class="mini ph"><Icon :name="row.kind === 'video' ? 'video' : 'image'" :size="14" /></span>
           <div class="grow">
-            <div class="fnrow"><span class="ellipsis strongish" :title="row.path">{{ row.filename }}</span><span v-if="row.missing" class="miss" title="The file was moved or deleted">missing</span></div>
+            <div class="fnrow"><FileName class="strongish" :name="row.filename" :title="row.path" /><span v-if="row.missing" class="miss" title="The file was moved or deleted">missing</span></div>
             <div v-if="row.tags.length" class="tiny muted ellipsis">{{ row.tags.map((x: string) => `#${x}`).join(' ') }}</div>
           </div>
         </div>
@@ -188,12 +193,19 @@ const columns: Column[] = [
 .dropveil { position: fixed; inset: 0; z-index: 700; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px); display: grid; place-items: center; pointer-events: none; }
 .dropcard { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 56px; border: 2px dashed var(--fg); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow-3); }
 .fcell { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.mini { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex: none; background: var(--panel-2); }
+.mini { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex: none; background: var(--panel-2); outline: 1px solid var(--line); outline-offset: -1px; }
 .mini.ph { display: grid; place-items: center; color: var(--faint); }
 .strongish { font-weight: 500; }
 .missn { color: var(--bad); }
+/* the count and the explanation are two lines, never run together */
+.desc { flex-basis: 100%; text-wrap: pretty; }
+/* grid / list: icon-only, as on the Brands page */
+.vt { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: var(--r-pill); background: var(--panel-2); border: 1px solid var(--line-soft); flex: none; }
+.vt button { width: 34px; height: 30px; display: grid; place-items: center; border-radius: var(--r-pill); color: var(--muted); transition: background-color 200ms var(--ease-out), color 200ms; }
+.vt button:hover { color: var(--fg); }
+.vt button[aria-pressed='true'] { background: var(--fg); color: var(--bg); }
 .fnrow { display: flex; align-items: baseline; min-width: 0; }
-.fnrow .ellipsis { min-width: 0; }
+.fnrow .fname { min-width: 0; }
 .miss { flex: none; margin-left: 8px; font-size: var(--fs-2xs); color: var(--bad); font-family: var(--mono); text-transform: uppercase; }
 .fits { display: inline-flex; gap: 3px; flex-wrap: nowrap; }
 .mini.gone { opacity: .4; filter: grayscale(1); }
