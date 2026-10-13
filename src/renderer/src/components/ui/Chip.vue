@@ -15,7 +15,7 @@ const tone = computed(() => props.tone ?? s.value?.tone ?? 'neutral');
 <template>
   <Transition name="swap" mode="out-in">
     <span :key="status ?? tone" class="chip" :class="[`t-${tone}`, size === 'sm' ? 'sm' : '']">
-      <span v-if="dot !== false" class="d" :class="{ live: tone === 'signal' }" />
+      <span v-if="dot" class="d" :class="{ live: tone === 'signal' }" />
       <slot>{{ s?.label ?? status }}</slot>
     </span>
   </Transition>
