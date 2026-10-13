@@ -11,6 +11,7 @@ import BrandStatus from './BrandStatus.vue';
 import { useBrandActions } from './actions';
 import { accountTip, serialText } from '@/components/common/login';
 import { ago, dateTime } from '@/lib/format';
+import { capital } from '@/components/common/text';
 
 /**
  * The brands table (AdsPower's profile list, FF Ops' hairline table). Selection with checkboxes
@@ -226,10 +227,10 @@ const accRest = (b: BrandRow) => (b.accounts.length <= MAX_ACC ? [] : b.accounts
               <AccountBadge v-for="a in accShown(b)" :key="a.id" :account="a" />
               <span v-if="accRest(b).length" class="acc-more num" :class="{ bad: accRest(b).some(a => a.loginState === 'expired') }" :title="accRest(b).map(accountTip).join('\n')">+{{ accRest(b).length }}</span>
             </div>
-            <span v-else class="muted small nowrap">No accounts</span>
+            <span v-else class="muted">—</span>
           </td>
           <td class="c-status"><BrandStatus :status="b.status" :error="b.statusError" /></td>
-          <td class="c-last"><span class="small muted nowrap" :title="dateTime(b.lastOpenedAt)">{{ b.lastOpenedAt ? ago(b.lastOpenedAt) : 'Never' }}</span></td>
+          <td class="c-last"><span class="small muted nowrap" :title="dateTime(b.lastOpenedAt)">{{ b.lastOpenedAt ? capital(ago(b.lastOpenedAt)) : 'Never' }}</span></td>
           <td class="c-act" @click.stop>
             <Btn v-if="b.status === 'open' || b.status === 'opening'" size="sm" :loading="act.pending.has(b.id) || b.status === 'opening'" @click="act.close(b)">Close</Btn>
             <Btn v-else size="sm" variant="primary" icon="open" :loading="act.pending.has(b.id)" @click="act.open(b)">{{ b.status === 'error' ? 'Reopen' : 'Open' }}</Btn>
@@ -284,7 +285,7 @@ tr.br:hover .grip, tr.br:focus-visible .grip { opacity: 1; }
 .c-act { width: 108px; text-align: right; padding-right: 2px; }
 .c-menu { width: 44px; padding-left: 2px; text-align: right; }
 td.c-act, td.c-menu { overflow: visible; }
-.c-act :deep(.btn) { min-width: 82px; }
+.c-act :deep(.btn) { min-width: 96px; } /* Open, Reopen and Close share one width so both edges line up */
 
 .nm { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .nm-line { display: flex; align-items: center; gap: 4px; min-width: 0; }

@@ -88,28 +88,36 @@ async function purge() {
   binBusy.value = 'purge';
   try { await api('brands.purge', { ids: [b.value.id] }); ok(`${name} deleted`); void router.push('/recycle'); } catch (e) { fail(e, 'Could not delete'); } finally { binBusy.value = null; }
 }
+// The header reads its own width: a narrow page (the 980 px window) gets the compact header so the
+// tabs start high, and long names step the title size down instead of being cut.
+const hdWrap = ref<HTMLElement | null>(null);
+const hdWidth = ref(1200);
+let ro: ResizeObserver | null = null;
+watch(hdWrap, el => { ro?.disconnect(); if (el) { ro = new ResizeObserver(([e]) => (hdWidth.value = e.contentRect.width)); ro.observe(el); } });
+onBeforeUnmount(() => ro?.disconnect());
+const compact = computed(() => hdWidth.value < 760);
+const nameSize = computed(() => { const n = b.value?.name.length ?? 0; return n > 44 ? 'name-xl' : n > 26 ? 'name-l' : ''; });
 const notFound = computed(() => !!brand.error.value && /not found/i.test(brand.error.value));
 </script>
 
 <template>
   <div class="page bd">
-    <RouterLink to="/" class="back"><Icon name="arrow-left" :size="14" /><span>Brands</span></RouterLink>
+    <RouterLink v-if="notFound || (brand.error.value && !b)" to="/" class="back"><Icon name="arrow-left" :size="14" /><span>Brands</span></RouterLink>
 
     <EmptyState v-if="notFound" icon="cubby" title="This brand no longer exists" body="It may have been deleted for good from the recycle bin."><Btn to="/" icon="arrow-left">Back to brands</Btn></EmptyState>
     <LoadError v-else-if="brand.error.value && !b" :error="brand.error.value" title="Could not load this brand" @retry="brand.reload()" />
 
     <template v-else>
-      <header class="hd-wrap">
-        <div v-if="b" class="hd">
-          <BrandAvatar :brand="b" :size="64" class="av" />
-          <div class="id">
-            <div class="label meta"><span class="code">{{ serialText(b.serial) }}</span><template v-if="b.groupName"><span class="sl" /><span class="ellipsis" :title="b.groupName">{{ b.groupName }}</span></template></div>
-            <h1 class="display title" :title="b.name"><span class="mask"><span class="clamp">{{ b.name }}</span></span></h1>
-            <div class="sub">
-              <BrandStatus :status="b.status" :error="b.statusError" />
-              <span v-if="b.accounts.length" class="accts"><AccountBadge v-for="a in b.accounts" :key="a.id" :account="a" /></span>
-              <span v-for="t in b.tags" :key="t" class="tg" :title="t">{{ t }}</span>
-            </div>
+      <header ref="hdWrap" class="hd-wrap" :class="{ compact }">
+        <div v-if="b" class="hd" :class="nameSize">
+          <RouterLink to="/" class="back"><Icon name="arrow-left" :size="14" /><span>Brands</span></RouterLink>
+          <div class="label meta"><span class="code">{{ serialText(b.serial) }}</span><template v-if="b.groupName"><span class="sl" /><span class="ellipsis" :title="b.groupName">{{ b.groupName }}</span></template></div>
+          <BrandAvatar :brand="b" :size="compact ? 48 : 64" class="av" />
+          <h1 class="display title" :title="b.name"><span class="mask"><span class="clamp">{{ b.name }}</span></span></h1>
+          <div class="sub">
+            <BrandStatus :status="b.status" :error="b.statusError" />
+            <span v-if="b.accounts.length" class="accts"><AccountBadge v-for="a in b.accounts" :key="a.id" :account="a" /></span>
+            <span v-for="t in b.tags" :key="t" class="tg" :title="t">{{ t }}</span>
           </div>
           <div v-if="!binned" class="acts">
             <Btn v-if="isOpen" icon="front" :disabled="b.status !== 'open'" @click="act.front(b)">Bring to front</Btn>
@@ -122,8 +130,11 @@ const notFound = computed(() => !!brand.error.value && /not found/i.test(brand.e
           </div>
         </div>
         <div v-else class="hd" aria-busy="true">
-          <div class="skel av" style="width: 64px; height: 64px; border-radius: 16px" />
-          <div class="id"><div class="skel-line" style="width: 80px" /><div class="skel" style="width: 260px; max-width: 100%; height: 44px; margin-top: 12px" /><div class="skel-line" style="width: 180px; margin-top: 14px" /></div>
+          <RouterLink to="/" class="back"><Icon name="arrow-left" :size="14" /><span>Brands</span></RouterLink>
+          <div class="meta"><div class="skel-line" style="width: 80px" /></div>
+          <div class="skel av" :style="{ width: `${compact ? 48 : 64}px`, height: `${compact ? 48 : 64}px`, borderRadius: compact ? '12px' : '16px' }" />
+          <div class="title"><div class="skel" style="width: 260px; max-width: 100%; height: 44px" /></div>
+          <div class="sub"><div class="skel-line" style="width: 180px" /></div>
         </div>
       </header>
 
@@ -160,18 +171,35 @@ const notFound = computed(() => !!brand.error.value && /not found/i.test(brand.e
 .back { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--muted); margin-bottom: 18px; transition: color 200ms, gap 300ms var(--ease-out); }
 .back:hover { color: var(--fg); gap: 9px; }
 .hd-wrap { container-type: inline-size; padding-bottom: 22px; }
-.hd { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; column-gap: 20px; row-gap: 18px; }
-.id { min-width: 0; }
-.acts { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
-/* not enough room beside a long name: the actions move to their own row */
-@container (max-width: 860px) { .hd { grid-template-columns: auto minmax(0, 1fr); } .acts { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; } }
-.meta { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; min-width: 0; }
+/* Back link; serial / group; the avatar top-aligned with the title's first line; the title takes the
+   whole row beside the avatar (long names are never squeezed by the actions); status, accounts and
+   tags share the row under it with the actions. */
+.hd { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'back back back' '. meta meta' 'av title title' 'av sub acts'; align-items: start; column-gap: 20px; }
+.back { grid-area: back; justify-self: start; }
+.meta { grid-area: meta; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; min-width: 0; }
+.av { grid-area: av; }
+.title { grid-area: title; min-width: 0; text-wrap: balance; }
+.sub { grid-area: sub; align-self: center; display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; min-width: 0; margin-top: 14px; }
+.acts { grid-area: acts; align-self: center; display: flex; gap: 8px; align-items: center; margin-top: 14px; }
 .sl { width: 1.5px; height: 11px; flex: none; background: var(--fg); transform: skewX(calc(var(--slash) * -1)); }
 .title .mask { display: block; }
 .title .clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; padding-bottom: .1em; margin-bottom: -.1em; }
-.sub { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; min-width: 0; }
+/* long names step down rather than get cut */
+.name-l .title { font-size: clamp(32px, 2.9vw, 44px); }
+.name-xl .title { font-size: clamp(28px, 2.4vw, 38px); }
 .accts { display: inline-flex; gap: 5px; flex-wrap: wrap; }
 .tg { height: 22px; max-width: 220px; line-height: 22px; padding: 0 9px; border-radius: var(--r-pill); background: var(--panel-2); font-size: var(--fs-xs); font-weight: 500; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Compact (the 980 px window): smaller title and avatar, and the actions move up beside the back
+   link, so status and chips get their row to themselves and the tabs start high. */
+.compact { padding-bottom: 16px; }
+.compact .hd { column-gap: 16px; grid-template-areas: 'back back acts' '. meta meta' 'av title title' 'av sub sub'; }
+.compact .back { align-self: center; margin-bottom: 0; }
+.compact .acts { margin: 0 0 6px; }
+.compact .meta { margin-bottom: 8px; }
+.compact .title { font-size: 34px; }
+.compact .name-l .title { font-size: 30px; }
+.compact .name-xl .title { font-size: 26px; letter-spacing: -.03em; }
+.compact .sub { margin-top: 10px; }
 .sq { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line-strong); color: var(--fg); transition: border-color 200ms, background-color 200ms; }
 .sq:hover { border-color: var(--fg); background: var(--panel-2); }
 .sq:active { background: var(--line); }

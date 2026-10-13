@@ -37,7 +37,7 @@ void props;
     <div class="row gap-4">
       <BrandAvatar :brand="{ name: name || '?', color, logo: modelValue }" :size="56" />
       <div class="row wrap gap-2">
-        <Btn size="sm" icon="grid" :disabled="!kits?.length" @click="showKits = !showKits">{{ kits === null ? 'Looking for brand kits…' : kits.length ? `Brand kits (${kits.length})` : 'No brand kits found' }}</Btn>
+        <Btn size="sm" icon="grid" :disabled="!kits?.length" @click="showKits = !showKits"><template v-if="kits === null">Looking for brand kits…</template><template v-else-if="kits.length">Brand kits<span class="count num">{{ kits.length }}</span></template><template v-else>No brand kits found</template></Btn>
         <Btn size="sm" icon="upload" :loading="busy" @click="upload">Upload image</Btn>
         <Btn v-if="modelValue" size="sm" variant="subtle" icon="close" @click="emit('update:modelValue', null)">Use initials</Btn>
       </div>
@@ -64,5 +64,7 @@ void props;
 .kit:hover, .kit:focus-visible { border-color: var(--fg); transform: translateY(-1px); }
 .kit.sel { border-color: var(--fg); box-shadow: 0 0 0 2px var(--fg); }
 .kit img { max-width: 100%; max-height: 100%; object-fit: contain; }
+/* the same count chip as tabs and segmented controls */
+.count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 99px; font-family: var(--mono); font-size: var(--fs-2xs); background: color-mix(in srgb, currentColor 14%, transparent); }
 .tick { position: absolute; top: 4px; right: 4px; color: var(--ink); background: var(--lime); border-radius: 50%; padding: 1px; }
 </style>

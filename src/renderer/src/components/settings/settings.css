@@ -1,5 +1,6 @@
 /* Settings layout: a label column (title + why) and a control column, hairline-separated rows. */
-.set-sec { max-width: 920px; }
+/* rows run the full content width, like the header rule and the tab strip above them; controls cap themselves */
+.set-sec { max-width: none; }
 .set-row { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 28px; padding: 22px 0; border-top: 1px solid var(--line-soft); }
 .set-row:first-child { border-top: 0; padding-top: 4px; }
 .set-l { display: flex; flex-direction: column; gap: 4px; }

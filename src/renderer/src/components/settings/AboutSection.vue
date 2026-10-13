@@ -22,7 +22,7 @@ const platform = (p?: string) => (p === 'win32' ? 'Windows' : p === 'darwin' ? '
     <dl class="facts ab">
       <dt>Version</dt><dd class="num">{{ app.status?.version ?? '—' }} · {{ platform(app.status?.platform) }}</dd>
       <dt>Google Chrome</dt><dd>{{ app.status?.chrome ? app.status.chrome.version : 'Not found' }}<div v-if="app.status?.chrome" class="tiny muted code">{{ app.status.chrome.path }}</div></dd>
-      <dt>Data folder</dt><dd><span class="code small">{{ app.status?.dataDir ?? '—' }}</span><div><Btn size="sm" variant="subtle" icon="folder" class="mt-2" @click="reveal(app.status?.dataDir)">Show in {{ isMac ? 'Finder' : 'Explorer' }}</Btn></div></dd>
+      <dt>Data folder</dt><dd><div v-if="app.status?.dataDir" class="tiny muted code">{{ app.status.dataDir }}</div><template v-else>—</template><div v-if="app.status?.dataDir" class="reveal"><Btn size="sm" icon="folder" @click="reveal(app.status?.dataDir)">Show in {{ isMac ? 'Finder' : 'Explorer' }}</Btn></div></dd>
       <dt>Local API</dt><dd class="code small">{{ app.status?.apiUrl ?? '—' }}</dd>
       <dt>MCP</dt><dd class="code small">{{ app.status?.mcpUrl ?? '—' }}</dd>
       <dt>Open brands</dt><dd class="num">{{ app.status?.openBrands ?? 0 }}</dd>
@@ -34,4 +34,6 @@ const platform = (p?: string) => (p === 'win32' ? 'Windows' : p === 'darwin' ? '
 .hero { display: flex; align-items: center; gap: 18px; padding: 4px 0 24px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
 .ab { max-width: none; }
 .ab dd { overflow-wrap: anywhere; }
+/* the button's edge sits on the values' right edge */
+.reveal { display: flex; justify-content: flex-end; margin-top: 8px; }
 </style>

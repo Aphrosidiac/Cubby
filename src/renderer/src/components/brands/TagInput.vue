@@ -64,13 +64,14 @@ function onInput() { listOpen.value = true; pickedByArrow.value = false; active.
 </template>
 
 <style scoped>
-.ti { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 40px; padding: 6px 8px; border-radius: var(--r); background: var(--panel); border: 1px solid var(--line); cursor: text; transition: border-color var(--t-micro), box-shadow var(--t-micro); }
+/* one line at the height of the inputs beside it (40px); it grows a line at a time as tags wrap */
+.ti { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 40px; padding: 4px 8px; border-radius: var(--r); background: var(--panel); border: 1px solid var(--line); cursor: text; transition: border-color var(--t-micro), box-shadow var(--t-micro); }
 .ti:hover { border-color: var(--line-strong); }
 .ti.focused { border-color: var(--focus-border); box-shadow: var(--focus-ring); }
 .tag { display: inline-flex; align-items: center; gap: 4px; max-width: 220px; height: 24px; padding: 0 4px 0 9px; border-radius: var(--r-pill); background: var(--panel-2); font-size: var(--fs-sm); font-weight: 500; }
 .x { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); }
 .x:hover { background: var(--line); color: var(--fg); }
-input { flex: 1; min-width: 90px; border: 0; background: none; outline: none; padding: 3px 2px; font-size: var(--fs-base); }
+input { flex: 1; min-width: 90px; height: 30px; border: 0; background: none; outline: none; padding: 0 4px; font-size: var(--fs-base); color: var(--fg); }
 input:focus, input:focus-visible { outline: none; box-shadow: none; }
 input::placeholder { color: var(--faint); }
 .sugg { position: absolute; top: calc(100% + 6px); left: 0; z-index: 50; min-width: 220px; max-height: 240px; overflow-y: auto; padding: 5px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-2); }

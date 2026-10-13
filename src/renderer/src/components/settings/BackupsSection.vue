@@ -22,10 +22,10 @@ import { ago, bytes, dateTime } from '@/lib/format';
 /** Scheduled encrypted backups (database + every brand profile), restore, and moving brands between computers. */
 const { form, dirty, busy, save, discard } = useSection(['backup']);
 const SCHEDULES = [
-  { value: '0 3 * * *', label: 'Every day at 03:00' },
+  { value: '0 3 * * *', label: 'Every day at 3:00 am' },
   { value: '0 */12 * * *', label: 'Every 12 hours' },
-  { value: '0 3 * * 0', label: 'Every Sunday at 03:00' },
-  { value: '0 3 1 * *', label: 'First of the month, 03:00' },
+  { value: '0 3 * * 0', label: 'Every Sunday at 3:00 am' },
+  { value: '0 3 1 * *', label: 'First of the month at 3:00 am' },
   { value: 'custom', label: 'Custom (cron)…' }
 ];
 const customCron = ref(!SCHEDULES.some(s => s.value === form.backup.cron));
@@ -102,13 +102,13 @@ const exportNames = computed(() => (exportIds.value ?? []).map(id => brands.data
       <div class="set-c">
         <Toggle v-model="form.backup.enabled" label="Back up automatically" />
         <Field label="Folder" class="w">
-          <div class="set-pair nowrap-pair"><input :value="form.backup.folder ?? ''" class="input" readonly placeholder="Choose a folder" @click="pickFolder" /><Btn size="sm" icon="folder" @click="pickFolder">Choose…</Btn></div>
+          <div class="set-pair nowrap-pair"><input :value="form.backup.folder ?? ''" class="input" readonly placeholder="Choose a folder" @click="pickFolder" /><Btn icon="folder" @click="pickFolder">Choose…</Btn></div>
         </Field>
         <div class="set-pair">
           <Field label="When"><Select v-model="schedule" :options="SCHEDULES" :min-width="240" style="width: 240px" /></Field>
           <Field label="Keep the newest"><div class="set-pair"><input v-model.number="form.backup.keep" type="number" min="1" max="100" class="input num" /><span class="small muted">backups</span></div></Field>
         </div>
-        <Field v-if="schedule === 'custom'" label="Cron expression" :error="cronOk ? null : 'Five fields: minute hour day month weekday'" hint="e.g. 30 2 * * 1-5 = 02:30 on weekdays"><input v-model="form.backup.cron" class="input code" style="width: 240px" /></Field>
+        <Field v-if="schedule === 'custom'" label="Cron expression" :error="cronOk ? null : 'Five fields: minute hour day month weekday'" hint="e.g. 30 2 * * 1-5 = 2:30 am on weekdays"><input v-model="form.backup.cron" class="input code" style="width: 240px" /></Field>
         <span v-if="form.backup.enabled && !app.settings?.backupPassphraseSet" class="warn small">Scheduled backups need a saved backup passphrase (below).</span>
         <span v-if="form.backup.enabled && !form.backup.folder" class="warn small">Choose a folder for scheduled backups.</span>
       </div>

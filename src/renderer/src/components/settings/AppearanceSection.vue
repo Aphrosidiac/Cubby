@@ -21,7 +21,7 @@ const pick = (t: Settings['theme']) => setTheme(t).catch(e => fail(e));
         <div class="themes" role="radiogroup" aria-label="Theme">
           <button v-for="o in OPTS" :key="o.value" type="button" role="radio" :aria-checked="app.settings?.theme === o.value" class="th" @click="pick(o.value)">
             <span class="pv" :class="`pv-${o.value}`"><span class="bar" /><span class="side" /><span class="l1" /><span class="l2" /></span>
-            <span class="row gap-2 lbl"><Icon :name="o.icon" :size="15" /><span class="strong small">{{ o.label }}</span><span class="tiny muted">{{ o.note }}</span></span>
+            <span class="lbl"><span class="row gap-2"><Icon :name="o.icon" :size="15" /><span class="strong small">{{ o.label }}</span></span><span class="tiny muted note">{{ o.note }}</span></span>
           </button>
         </div>
       </div>
@@ -30,12 +30,14 @@ const pick = (t: Settings['theme']) => setTheme(t).catch(e => fail(e));
 </template>
 
 <style scoped>
-.themes { display: flex; gap: 14px; flex-wrap: wrap; }
+/* three equal columns; each preview fills its card */
+.themes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; width: 100%; max-width: 620px; }
 .th { display: flex; flex-direction: column; gap: 10px; padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); transition: border-color 200ms, box-shadow 200ms; }
 .th:hover { border-color: var(--line-strong); }
 .th[aria-checked='true'] { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg); }
-.lbl { padding: 0 4px 2px; }
-.pv { position: relative; display: block; width: 168px; height: 104px; border-radius: 7px; overflow: hidden; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .1); }
+.lbl { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 4px 2px; text-align: left; }
+.note { padding-left: 23px; }
+.pv { position: relative; display: block; width: 100%; aspect-ratio: 168 / 104; border-radius: 7px; overflow: hidden; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .1); }
 .pv-light { background: #f3efe4; }
 .pv-dark { background: #0b0b0a; }
 .pv-system { background: linear-gradient(105deg, #f3efe4 50%, #0b0b0a 50%); }

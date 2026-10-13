@@ -56,7 +56,7 @@ function key(e: KeyboardEvent, b: BrandRow) {
         <footer class="foot" @click.stop>
           <div class="grow col gap-1 when">
             <BrandStatus :status="b.status" :error="b.statusError" compact />
-            <span class="tiny muted ellipsis" :title="b.lastOpenedAt ? `Last opened ${dateTime(b.lastOpenedAt)}` : undefined">{{ b.lastOpenedAt ? ago(b.lastOpenedAt) : 'Never opened' }}</span>
+            <span class="tiny muted ellipsis" :title="b.lastOpenedAt ? `Last opened ${dateTime(b.lastOpenedAt)}` : undefined">{{ b.lastOpenedAt ? `Opened ${ago(b.lastOpenedAt)}` : 'Never opened' }}</span>
           </div>
           <Btn v-if="b.status === 'open' || b.status === 'opening'" size="sm" :loading="act.pending.has(b.id) || b.status === 'opening'" @click="act.close(b)">Close</Btn>
           <Btn v-else size="sm" variant="primary" icon="open" :loading="act.pending.has(b.id)" @click="act.open(b)">{{ b.status === 'error' ? 'Reopen' : 'Open' }}</Btn>

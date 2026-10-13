@@ -35,9 +35,9 @@ function hex(e: Event) {
 <style scoped>
 .cp { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .sw { display: flex; flex-wrap: wrap; gap: 6px; }
-.s { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; color: #fff; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .14); transition: transform 240ms var(--ease-out); mix-blend-mode: normal; }
+.s { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; color: #fff; box-shadow: inset 0 0 0 1px var(--line-strong); transition: transform 240ms var(--ease-out); mix-blend-mode: normal; }
 .s:hover { transform: scale(1.1); }
-.s[aria-checked='true'] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--fg); }
+.s[aria-checked='true'] { box-shadow: inset 0 0 0 1px var(--line-strong), 0 0 0 2px var(--bg), 0 0 0 3.5px var(--fg); }
 .s[style*='#d9ff43'] { color: var(--ink); }
 .custom { display: inline-flex; align-items: center; gap: 6px; }
 input[type=color] { width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: none; cursor: pointer; }
