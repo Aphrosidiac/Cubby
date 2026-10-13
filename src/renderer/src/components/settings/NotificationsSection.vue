@@ -17,7 +17,7 @@ const chatOk = computed(() => !form.notifications.telegramChatId || /^-?\d{3,}$|
 const tgReady = computed(() => !!form.notifications.telegramBotToken?.trim() && !!form.notifications.telegramChatId?.trim() && tokOk.value && chatOk.value);
 const testing = ref(false);
 async function test() {
-  if (!tgReady.value) { toast('Add the bot token and chat id first', { tone: 'warn' }); return; }
+  if (!tgReady.value) { toast('Add the bot token and chat ID first', { tone: 'warn' }); return; }
   testing.value = true;
   try {
     const r = await api('settings.testTelegram', { botToken: form.notifications.telegramBotToken ?? undefined, chatId: form.notifications.telegramChatId ?? undefined });
@@ -31,11 +31,11 @@ function setChat(v: string) { form.notifications.telegramChatId = v.trim() || nu
 <template>
   <div class="set-sec">
     <div class="set-row">
-      <div class="set-l"><span class="t">{{ isMac ? 'macOS' : 'Windows' }} notifications</span><span class="d">Posts waiting for approval, posts that need you, logins that expired, checkpoints. Clicking one opens Cubby on the right screen.</span></div>
+      <div class="set-l"><span class="t">{{ isMac ? 'macOS' : 'Windows' }} notifications</span><span class="d">Posts waiting for approval, posts that need you, logins that expired, checkpoints. Clicking one opens Cubby on the matching page.</span></div>
       <div class="set-c"><Toggle v-model="form.notifications.os" label="Show system notifications" /></div>
     </div>
     <div class="set-row">
-      <div class="set-l"><span class="t">Telegram</span><span class="d">Optional. The same alerts as a Telegram message, for when you are away. Create a bot with @BotFather, send it a message, then paste its token and your chat id.</span></div>
+      <div class="set-l"><span class="t">Telegram</span><span class="d">Optional. The same alerts as a Telegram message, for when you are away. Create a bot with @BotFather, send it a message, then paste its token and your chat ID.</span></div>
       <div class="set-c">
         <Field label="Bot token" for="tg-token" :error="tokOk ? null : 'Looks like 123456789:AA… from @BotFather'" class="w">
           <div class="tok">
@@ -43,7 +43,7 @@ function setChat(v: string) { form.notifications.telegramChatId = v.trim() || nu
             <button type="button" class="eye" :aria-label="showTok ? 'Hide token' : 'Show token'" :title="showTok ? 'Hide token' : 'Show token'" :aria-pressed="showTok" @click="showTok = !showTok"><Icon :name="showTok ? 'lock' : 'eye'" :size="14" /></button>
           </div>
         </Field>
-        <Field label="Chat id" for="tg-chat" :error="chatOk ? null : 'A number like 123456789 (or -100… for a group)'" class="w">
+        <Field label="Chat ID" for="tg-chat" :error="chatOk ? null : 'A number like 123456789 (or -100… for a group)'" class="w">
           <input id="tg-chat" :value="form.notifications.telegramChatId ?? ''" class="input code" autocomplete="off" spellcheck="false" placeholder="123456789" @input="setChat(($event.target as HTMLInputElement).value)" />
         </Field>
         <div class="set-pair"><Btn size="sm" icon="send" :disabled="!tgReady" :loading="testing" @click="test">Send test</Btn><span class="set-note">Sends one test message. After that Cubby only messages Telegram when something needs you.</span></div>

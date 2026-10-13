@@ -9,19 +9,18 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import PlatformIcon from '@/components/common/PlatformIcon.vue';
 import LoadError from '@/components/common/LoadError.vue';
 import BrandStatus from '../BrandStatus.vue';
-import { useBrandActions } from '../actions';
 import { LOGIN_LABEL, LOGIN_TONE, TIER_LABEL, handleText } from '@/components/common/login';
 import { postStatus, KIND_LABEL } from '@/components/posts/meta';
 import { humanAction, detailLine } from '@/components/activity/humanize';
-import { api } from '@/lib/api';
+import { api, isMac } from '@/lib/api';
 import { useLoad } from '@/composables/useLoad';
 import { fail, ok, toast } from '@/composables/toast';
 import { ago, date, dateTime } from '@/lib/format';
+import { capital } from '@/components/common/text';
 
 /** Brand at a glance: window, login health per platform (Check now), what's scheduled next, what happened lately. */
 const props = defineProps<{ brand: BrandRow }>();
 const emit = defineEmits<{ tab: [t: string] }>();
-const act = useBrandActions();
 const posts = useLoad(() => api('posts.list', { brandId: props.brand.id, status: ['ready_for_approval', 'approved', 'queued', 'running', 'needs_human'], from: new Date(Date.now() - 3600_000).toISOString(), limit: 6 }), { topics: ['posts.changed'] });
 const activity = useLoad(() => api('activity.list', { brandId: props.brand.id, limit: 8 }), { topics: ['activity.new'] });
 const binned = computed(() => !!props.brand.deletedAt);
@@ -37,6 +36,10 @@ async function check() {
 const upcoming = computed(() => (posts.data.value ?? []).slice().sort((a, b) => (a.scheduledAt ?? '9').localeCompare(b.scheduledAt ?? '9')));
 const isPast = (d: string) => new Date(d) < new Date();
 const ACTOR: Record<string, string> = { you: 'You', claude: 'Claude', scheduler: 'Scheduler', flow: 'Flow', api: 'Local API' };
+const profileShort = computed(() => {
+  const p = props.brand.profileDir.split(/[\\/]/).slice(-2).join('/');
+  return { head: p.slice(0, Math.max(0, p.length - 12)), tail: p.slice(-12) };
+});
 const revealProfile = () => api('app.revealPath', { path: props.brand.profileDir }).catch(e => fail(e));
 </script>
 
@@ -46,16 +49,12 @@ const revealProfile = () => api('app.revealPath', { path: props.brand.profileDir
       <header class="panel-head"><h3 class="h3">Window</h3><BrandStatus :status="brand.status" :error="brand.statusError" /></header>
       <div class="panel-body">
         <dl class="facts">
-          <dt>Last opened</dt><dd :title="brand.lastOpenedAt ? dateTime(brand.lastOpenedAt) : undefined">{{ brand.lastOpenedAt ? ago(brand.lastOpenedAt) : 'Never' }}</dd>
+          <dt>Last opened</dt><dd :title="brand.lastOpenedAt ? dateTime(brand.lastOpenedAt) : undefined">{{ brand.lastOpenedAt ? capital(ago(brand.lastOpenedAt)) : 'Never' }}</dd>
           <dt>Window</dt><dd class="num">{{ brand.window.width }} × {{ brand.window.height }}</dd>
           <dt>Approval</dt><dd>{{ brand.approvalRequired ? 'Posts wait for approval' : 'Not required' }}</dd>
-          <dt>Profile folder</dt><dd><button type="button" class="link small path" :title="brand.profileDir" @click="revealProfile">{{ brand.profileDir.split(/[\\/]/).slice(-2).join('/') }}</button></dd>
+          <dt>Profile folder</dt><dd class="pd"><button type="button" class="link small path" :title="`${brand.profileDir} — show in ${isMac ? 'Finder' : 'Explorer'}`" @click="revealProfile"><span class="ph">{{ profileShort.head }}</span><span class="pt">{{ profileShort.tail }}</span></button></dd>
         </dl>
         <p v-if="brand.status === 'error'" class="err small mt-3"><Icon name="warn" :size="14" /><span>{{ brand.statusError || 'Chrome stopped unexpectedly.' }}</span></p>
-        <div v-if="!binned" class="row wrap gap-2 mt-4">
-          <Btn v-if="brand.status === 'open' || brand.status === 'opening'" size="sm" icon="front" :disabled="brand.status !== 'open'" @click="act.front(brand)">Bring to front</Btn>
-          <Btn size="sm" icon="globe" @click="act.openUrl(brand)">Open URL…</Btn>
-        </div>
       </div>
     </section>
 
@@ -75,7 +74,7 @@ const revealProfile = () => api('app.revealPath', { path: props.brand.profileDir
     </section>
 
     <section class="panel">
-      <header class="panel-head"><h3 class="h3">Coming up</h3><Btn v-if="!binned" size="sm" variant="subtle" icon="compose" :to="`/compose?brand=${brand.id}`">New post</Btn></header>
+      <header class="panel-head"><h3 class="h3">Coming up</h3><Btn v-if="!binned" size="sm" icon="compose" :to="`/compose?brand=${brand.id}`">New post</Btn></header>
       <LoadError v-if="posts.error.value" compact :error="posts.error.value" title="Could not load posts" class="m" @retry="posts.reload()" />
       <div v-else-if="posts.loading.value" class="panel-body"><div class="skel-line" style="width: 70%" /><div class="skel-line mt-3" style="width: 50%" /></div>
       <ul v-else-if="upcoming.length" class="list">
@@ -86,11 +85,11 @@ const revealProfile = () => api('app.revealPath', { path: props.brand.profileDir
           </RouterLink>
         </li>
       </ul>
-      <p v-else class="panel-body small muted">Nothing scheduled.</p>
+      <EmptyState v-else compact icon="calendar" title="Nothing scheduled" body="Posts waiting for approval or queued to publish show here." />
     </section>
 
     <section class="panel">
-      <header class="panel-head"><h3 class="h3">Recent activity</h3><button type="button" class="link small" @click="emit('tab', 'activity')">All activity</button></header>
+      <header class="panel-head"><h3 class="h3">Recent activity</h3><Btn size="sm" icon="activity" @click="emit('tab', 'activity')">All activity</Btn></header>
       <LoadError v-if="activity.error.value" compact :error="activity.error.value" class="m" @retry="activity.reload()" />
       <div v-else-if="activity.loading.value" class="panel-body"><div class="skel-line" style="width: 60%" /><div class="skel-line mt-3" style="width: 40%" /></div>
       <ul v-else-if="activity.data.value?.length" class="list">
@@ -102,17 +101,25 @@ const revealProfile = () => api('app.revealPath', { path: props.brand.profileDir
           </div>
         </li>
       </ul>
-      <p v-else class="panel-body small muted">Nothing yet.</p>
+      <EmptyState v-else compact icon="activity" title="Nothing yet" body="Opening the brand, posting and login checks show here." />
     </section>
   </div>
 </template>
 
 <style scoped>
-.ov { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.ov { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+/* cards in a row share one height; an empty state centres in the space left */
+.ov > .panel { display: flex; flex-direction: column; }
+.ov > .panel > :last-child:not(.panel-head) { flex: 1 1 auto; }
+.ov > .panel > .ff-empty { justify-content: center; }
 @media (max-width: 1180px) { .ov { grid-template-columns: minmax(0, 1fr); } }
 /* every head the same height whether it holds a chip, a button or a link */
 .panel-head { min-height: 64px; }
-.path { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+/* middle truncation: the start gives way, the last characters of the folder name stay */
+.pd { display: flex; justify-content: flex-end; }
+.path { display: inline-flex; max-width: 100%; min-width: 0; white-space: nowrap; }
+.path .ph { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.path .pt { flex: none; }
 .err { display: flex; align-items: flex-start; gap: 6px; color: var(--bad); }
 .err :deep(svg) { flex: none; margin-top: 2px; }
 .logins li, .li { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--line-soft); }

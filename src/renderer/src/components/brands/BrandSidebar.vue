@@ -158,8 +158,8 @@ const showAllTags = ref(false);
 .it { width: 100%; display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 36px 0 10px; border-radius: 7px; color: var(--fg-2); text-align: left; font-weight: 500; transition: background-color 160ms, color 160ms; min-width: 0; }
 .it .icon { color: var(--muted); flex: none; }
 .it:hover { background: var(--panel-2); color: var(--fg); }
-.it.on { background: var(--fg); color: var(--bg); }
-.it.on .icon, .it.on .n { color: color-mix(in srgb, var(--bg) 72%, transparent); }
+.it.on { background: var(--panel-2); color: var(--fg); font-weight: 600; }
+.it.on .icon { color: var(--fg); }
 .it.ghost { color: var(--muted); font-weight: 400; }
 .nog { color: var(--muted); }
 .it.on .nog { color: inherit; }
@@ -167,18 +167,15 @@ const showAllTags = ref(false);
 .it-row .it { flex: 1; padding-right: 8px; background: none; color: var(--fg-2); }
 .it-row:hover { background: var(--panel-2); }
 .it-row:hover .it { color: var(--fg); }
-.it-row.on { background: var(--fg); }
-.it-row.on .it { color: var(--bg); }
+.it-row.on { background: var(--panel-2); }
+.it-row.on .it { color: var(--fg); font-weight: 600; }
 .it-row :deep(.menu-root) { flex: none; width: 28px; display: grid; place-items: center; }
 .dots { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: var(--muted); opacity: 0; transition: opacity 140ms, background-color 140ms; }
 .it-row:hover .dots, .it-row:focus-within .dots, .dots.on { opacity: 1; }
-.it-row.on .dots { color: color-mix(in srgb, var(--bg) 80%, transparent); }
 .dots:hover, .dots:focus-visible { background: color-mix(in srgb, var(--muted) 20%, transparent); color: var(--fg); }
-.it-row.on .dots:hover, .it-row.on .dots:focus-visible { color: var(--bg); background: color-mix(in srgb, var(--bg) 18%, transparent); }
 .n { flex: none; font-family: var(--mono); font-size: var(--fs-2xs); color: var(--muted); min-width: 16px; text-align: right; font-variant-numeric: tabular-nums; }
 .n.bad { color: var(--bad); font-weight: 500; }
 .n.live { color: var(--good); font-weight: 500; }
-.it.on .n.bad, .it.on .n.live { color: var(--bg); }
 .swatch.empty { background: transparent; box-shadow: none; border: 1.5px dashed var(--muted); }
 [data-theme='dark'] .swatch:not(.empty) { box-shadow: inset 0 0 0 1px rgb(243 239 228 / .3); }
 .foot .it { padding-right: 10px; }

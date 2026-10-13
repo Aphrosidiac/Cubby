@@ -35,7 +35,7 @@ async function doSave() { if (await save('Chrome settings saved')) void refreshS
     <div class="set-row">
       <div class="set-l"><span class="t">Use a different Chrome</span><span class="d">Chrome Beta, Dev or a portable Chrome. A brand can also override this in its own settings.</span></div>
       <div class="set-c">
-        <div class="set-pair"><input :value="form.chromePath ?? ''" class="input code wide" readonly placeholder="Detected Chrome" @click="pick" /><Btn size="sm" icon="chrome" @click="pick">Choose…</Btn><Btn v-if="form.chromePath" size="sm" variant="subtle" @click="form.chromePath = null">Use detected</Btn></div>
+        <div class="set-pair"><input :value="form.chromePath ?? ''" class="input wide" :class="{ code: !!form.chromePath }" readonly placeholder="Detected Chrome" @click="pick" /><Btn icon="chrome" @click="pick">Choose…</Btn><Btn v-if="form.chromePath" variant="subtle" @click="form.chromePath = null">Use detected</Btn></div>
       </div>
     </div>
     <div class="set-row">

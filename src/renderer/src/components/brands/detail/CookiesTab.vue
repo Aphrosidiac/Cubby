@@ -105,8 +105,8 @@ const isPast = (d: string | null) => !!d && new Date(d) < new Date();
 
     <div v-if="!wanted" class="panel closed">
       <Icon name="cookie" :size="20" class="faint" />
-      <div v-if="binned" class="grow"><div class="strong small">{{ brand.name }} is in the recycle bin</div><div class="tiny muted">Restore it to read, export or clear its cookies.</div></div>
-      <div v-else class="grow"><div class="strong small ellipsis" :title="`${brand.name} is closed`">{{ brand.name }} is closed</div><div class="tiny muted">Reading its cookies opens the brand in the background for a moment, then closes it again. Values are never shown.</div></div>
+      <div v-if="binned" class="grow"><div class="lead small"><span class="strong">In the recycle bin</span><span class="muted">—</span><span class="nm" :title="brand.name">{{ brand.name }}</span></div><div class="tiny muted">Restore it to read, export or clear its cookies.</div></div>
+      <div v-else class="grow"><div class="lead small"><span class="strong">Closed</span><span class="muted">—</span><span class="nm" :title="brand.name">{{ brand.name }}</span></div><div class="tiny muted pretty">Reading its cookies opens the brand in the background for a moment, then closes it again. Values are never shown.</div></div>
       <Btn v-if="!binned" size="sm" icon="refresh" @click="loadNow">Load cookies</Btn>
     </div>
     <LoadError v-else-if="list.error.value" :error="list.error.value" title="Could not read this brand’s cookies" @retry="list.reload()" />
@@ -166,6 +166,11 @@ button.site:hover { background: var(--panel-hover); }
 .site:active { background: var(--panel-2); }
 .closed { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
 .closed .grow { min-width: 0; }
+/* the status leads and stays whole; only the brand name truncates */
+.lead { display: flex; align-items: baseline; gap: 6px; min-width: 0; margin-bottom: 2px; }
+.lead > * { flex: none; white-space: nowrap; }
+.lead .nm { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg-2); }
+.pretty { text-wrap: pretty; }
 .ck td { padding: 6px 18px 6px 0; border-top: 1px solid var(--line-soft); overflow-wrap: anywhere; }
 .ck td.code { word-break: break-all; }
 .ck td.right { white-space: nowrap; }

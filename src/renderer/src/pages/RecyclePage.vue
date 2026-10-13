@@ -63,11 +63,11 @@ const leftText = (b: BrandRow) => (left(b) === 0 ? 'Today' : `${left(b)} day${le
 
 <template>
   <div class="page">
-    <PageHeader eyebrow="Recycle bin" title="Recycle bin">
+    <PageHeader eyebrow="System" title="Recycle bin">
       <span>Deleted brands are kept {{ DAYS }} days with their logins, then removed for good.</span>
       <template v-if="rows.length" #actions>
-        <Btn size="sm" icon="undo" :loading="busy === 'all'" @click="restore(rows)">Restore all</Btn>
-        <Btn size="sm" variant="danger" icon="trash" :loading="busy === 'purge'" @click="purge(rows, true)">Empty recycle bin</Btn>
+        <Btn icon="undo" :loading="busy === 'all'" @click="restore(rows)">Restore all</Btn>
+        <Btn variant="danger" icon="trash" :loading="busy === 'purge'" @click="purge(rows, true)">Empty recycle bin</Btn>
       </template>
     </PageHeader>
 

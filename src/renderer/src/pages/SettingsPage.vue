@@ -41,7 +41,7 @@ const current = computed(() => SECTIONS[tab.value as keyof typeof SECTIONS]);
 
 <template>
   <div class="page">
-    <PageHeader eyebrow="Cubby" title="Settings"><span>How Cubby runs on this computer.</span></PageHeader>
+    <PageHeader eyebrow="System" title="Settings"><span>How Cubby runs on this computer.</span></PageHeader>
     <Tabs v-model="tab" :tabs="TABS" class="tabs" />
     <LoadError v-if="!app.settings" error="Settings did not load." title="Could not load settings" @retry="startStore()" />
     <Transition v-else name="fade" mode="out-in">
@@ -51,7 +51,8 @@ const current = computed(() => SECTIONS[tab.value as keyof typeof SECTIONS]);
 </template>
 
 <style scoped>
-.tabs { margin: -8px 0 26px; position: sticky; top: var(--topbar); z-index: 20; background: var(--bg); }
+/* the kit strip keeps 6px focus gutters with a -6px margin: keep that margin so the first tab sits on the content edge */
+.tabs { margin: -8px -6px 26px; position: sticky; top: var(--topbar); z-index: 20; background: var(--bg); }
 /* all nine tabs stay in view at the smallest window */
 @media (max-width: 1100px) { .page .tabs { gap: 14px; } }
 </style>

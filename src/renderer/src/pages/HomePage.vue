@@ -251,12 +251,12 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
       <span v-if="summary">{{ summary }}</span>
       <template #actions>
         <div v-if="!firstRun" class="tools" role="group" aria-label="Window tools">
-          <Btn size="sm" variant="subtle" icon="tile" :loading="arranging === 'tile'" :disabled="!openIds.length" title="Tile open brand windows (the selected ones, if any)" @click="arrange('tile')">Tile</Btn>
-          <Btn size="sm" variant="subtle" icon="cascade" :loading="arranging === 'cascade'" :disabled="!openIds.length" title="Cascade open brand windows" @click="arrange('cascade')">Cascade</Btn>
-          <Btn size="sm" variant="subtle" icon="close" :loading="arranging === 'close'" :disabled="!openIds.length" title="Close every open brand window" @click="closeAll">Close all</Btn>
+          <Btn variant="subtle" icon="tile" :loading="arranging === 'tile'" :disabled="!openIds.length" title="Tile open brand windows (the selected ones, if any)" @click="arrange('tile')">Tile</Btn>
+          <Btn variant="subtle" icon="cascade" :loading="arranging === 'cascade'" :disabled="!openIds.length" title="Cascade open brand windows" @click="arrange('cascade')">Cascade</Btn>
+          <Btn variant="subtle" icon="close" :loading="arranging === 'close'" :disabled="!openIds.length" title="Close every open brand window" @click="closeAll">Close all</Btn>
         </div>
         <Menu :items="importMenu" :width="240">
-          <Btn size="sm" icon="upload" icon-right="chevron-down">Import</Btn>
+          <Btn icon="upload" icon-right="chevron-down">Import</Btn>
         </Menu>
       </template>
     </PageHeader>
@@ -329,7 +329,7 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
           </template>
         </BrandCards>
         <p v-if="rows?.length && view === 'table'" class="tiny muted hint">
-          <span class="keys">Enter opens a brand’s window · Shift+Enter shows its page · Space selects{{ reorderable ? ' · drag the grip to reorder' : ' · clear the sort to drag-reorder' }}</span>
+          <span class="keys">Enter opens a brand’s window · Shift+Enter shows its page · Space selects{{ reorderable ? ' · Drag the grip to reorder' : ' · Clear the sort to drag-reorder' }}</span>
         </p>
       </section>
     </div>
@@ -371,6 +371,8 @@ const firstRun = computed(() => all.data.value !== null && all.data.value.length
 
 <style scoped>
 .tools { display: flex; gap: 2px; padding-right: 8px; margin-right: 4px; border-right: 1px solid var(--line); }
+/* text-weight buttons lead the group: the first icon sits on the content edge when the actions wrap under the title */
+.tools > :deep(.btn:first-child) { margin-left: -17px; }
 .layout { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 28px; align-items: start; }
 .side-closed .layout { grid-template-columns: minmax(0, 1fr); }
 .side { position: sticky; top: calc(var(--topbar) + 16px); max-height: calc(100vh - var(--topbar) - 32px); overflow-y: auto; overflow-x: visible; padding-right: 2px; }

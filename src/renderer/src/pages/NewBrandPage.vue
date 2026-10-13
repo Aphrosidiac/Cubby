@@ -170,11 +170,11 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
 
 <template>
   <div class="page nb">
-    <PageHeader eyebrow="New brand" :title="created ? 'Brand created' : 'New brand'" :back="{ to: '/', label: 'Brands' }">
+    <PageHeader eyebrow="Brands" :title="created ? 'Brand created' : 'New brand'" :back="{ to: '/', label: 'Brands' }">
       <span v-if="!created">Its own sealed Chrome profile: logins, cookies and extensions stay inside this brand.</span>
       <template v-if="!created" #actions>
-        <Btn size="sm" variant="subtle" icon="download" @click="downloadCsvTemplate">CSV template</Btn>
-        <Btn size="sm" icon="file" @click="csv">Batch create from CSV…</Btn>
+        <Btn variant="subtle" icon="download" @click="downloadCsvTemplate">CSV template</Btn>
+        <Btn icon="file" @click="csv">Batch create from CSV…</Btn>
       </template>
     </PageHeader>
 
@@ -192,7 +192,7 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
         <li v-for="a in created.accounts" :key="a.id"><PlatformIcon :platform="a.platform" :size="16" colored /><span class="strong">{{ PLATFORM_SPECS[a.platform].name }}</span><span class="muted">{{ handleText(a.platform, a.handle) }}</span><span class="grow" /><span class="tiny muted">{{ TIER_LABEL[a.ageTier] }}</span></li>
       </ul>
       <div class="done-acts">
-        <Btn variant="signal" size="lg" icon="key" :loading="act.pending.has(created.id)" @click="openAndLogin">{{ created.accounts.length ? 'Open and log in' : 'Open brand' }}</Btn>
+        <Btn variant="primary" size="lg" icon="key" :loading="act.pending.has(created.id)" @click="openAndLogin">{{ created.accounts.length ? 'Open and log in' : 'Open brand' }}</Btn>
         <Btn size="lg" icon-right="arrow" :to="`/brands/${created.id}`">Go to brand</Btn>
         <Btn variant="subtle" icon="plus" @click="another">Create another</Btn>
       </div>
@@ -208,7 +208,7 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
           <section v-if="step === 'identity'" key="identity" class="panel pad col gap-5">
             <div class="section-h"><h2 class="h2">Identity</h2><p class="small muted">How the brand shows in Cubby and in its Chrome window.</p></div>
             <Field label="Name" required :error="show('name', 'identity')">
-              <input ref="nameInput" v-model="form.name" class="input big" maxlength="80" placeholder="FF Dev Studio" @keydown.enter.prevent="next" />
+              <input ref="nameInput" v-model="form.name" class="input" maxlength="80" placeholder="e.g. Kopi Lab" @keydown.enter.prevent="next" />
             </Field>
             <Field label="Logo"><LogoPicker v-model="form.logo" :name="form.name" :color="form.color" /></Field>
             <Field label="Colour" hint="Tints the brand’s Chrome window and its tile here, so you can tell windows apart."><ColorPicker v-model="form.color" /></Field>
@@ -316,7 +316,7 @@ const winPreview = computed(() => { const s = 120 / Math.max(form.width, form.he
         <span class="tiny muted keys nowrap">{{ step === 'review' ? `${modKey}+Enter creates` : `${modKey}+Enter for next` }}</span>
         <Btn v-if="step === 'platforms' && !form.accounts.length" variant="ghost" @click="next">Skip for now</Btn>
         <Btn v-if="step !== 'review'" variant="primary" icon-right="arrow" :disabled="step === 'platforms' && !form.accounts.length" @click="next">Next</Btn>
-        <Btn v-else variant="signal" icon="check" :loading="creating" @click="create">Create brand</Btn>
+        <Btn v-else variant="primary" icon="check" :loading="creating" @click="create">Create brand</Btn>
       </footer>
     </template>
   </div>
@@ -332,7 +332,6 @@ html:has(.page.nb) { scroll-padding: 72px 0 96px; }
 .nb .h1 { overflow-wrap: anywhere; }
 .stepper-wrap { max-width: 560px; margin: 0 auto 28px; }
 .section-h { display: flex; flex-direction: column; gap: 4px; padding-bottom: 4px; }
-.input.big { font-size: var(--fs-lg); min-height: 48px; }
 .quick { display: flex; flex-wrap: wrap; gap: 8px; }
 .qp { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 12px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel); font-weight: 500; transition: border-color 160ms, transform 240ms var(--ease-out); }
 .qp:hover { border-color: var(--fg); transform: translateY(-1px); }
@@ -355,7 +354,7 @@ html:has(.page.nb) { scroll-padding: 72px 0 96px; }
 .pt { padding: 14px 0 0 50px; max-width: 480px; }
 .rv-acc { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .rv-a { display: inline-flex; align-items: center; gap: 7px; }
-.foot { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 10px; margin-top: 20px; padding: 14px 0 18px; background: var(--bg); box-shadow: 0 -1px 0 var(--line-soft); }
+.foot { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 10px; margin-top: 20px; padding: 14px 0 18px; background: var(--bg); border-top: 1px solid var(--line); }
 .done { padding: 32px; display: flex; flex-direction: column; gap: 22px; }
 .done-head { display: flex; gap: 20px; align-items: center; }
 .done-accts { display: flex; flex-direction: column; border-top: 1px solid var(--line-soft); }

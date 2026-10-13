@@ -77,7 +77,7 @@ const addUrl = () => form.startupUrls.push('');
     <section class="sec">
       <div class="sh"><h3 class="h3">Identity</h3><p class="tiny muted">Shown in Cubby and on the brand’s Chrome window.</p></div>
       <div class="col gap-4">
-        <Field label="Name" required :error="!form.name.trim() ? 'The brand needs a name' : null"><input v-model="form.name" class="input" maxlength="80" /></Field>
+        <Field label="Name" required :error="!form.name.trim() ? 'The brand needs a name' : null"><input v-model="form.name" class="input" maxlength="80" placeholder="e.g. Kopi Lab" /></Field>
         <Field label="Logo"><LogoPicker v-model="form.logo" :name="form.name" :color="form.color" /></Field>
         <Field label="Colour"><ColorPicker v-model="form.color" /></Field>
         <div class="grid-2">
@@ -123,10 +123,10 @@ const addUrl = () => form.startupUrls.push('');
       <div class="sh"><h3 class="h3">Browser</h3><p class="tiny muted">Where downloads go and which Chrome runs this brand.</p></div>
       <div class="col gap-4">
         <Field label="Downloads folder" hint="Empty = Chrome’s default Downloads folder.">
-          <div class="pick"><input :value="form.downloadsDir ?? ''" class="input" readonly placeholder="Chrome default" @click="pickDir" /><Btn size="sm" icon="folder" @click="pickDir">Choose…</Btn><Btn v-if="form.downloadsDir" size="sm" variant="subtle" @click="form.downloadsDir = null">Reset</Btn></div>
+          <div class="pick"><input :value="form.downloadsDir ?? ''" class="input" readonly placeholder="Chrome default" @click="pickDir" /><Btn icon="folder" @click="pickDir">Choose…</Btn><Btn v-if="form.downloadsDir" variant="subtle" @click="form.downloadsDir = null">Reset</Btn></div>
         </Field>
         <Field label="Chrome install" :hint="`Empty = the app-wide Chrome${app.status?.chrome ? ` (${app.status.chrome.version})` : ''}. Point at Chrome Beta or a portable Chrome to pin a version for this brand.`">
-          <div class="pick"><input :value="form.chromePath ?? ''" class="input code" readonly :placeholder="app.status?.chrome?.path ?? 'Detected Chrome'" @click="pickChrome" /><Btn size="sm" icon="chrome" @click="pickChrome">Choose…</Btn><Btn v-if="form.chromePath" size="sm" variant="subtle" @click="form.chromePath = null">Reset</Btn></div>
+          <div class="pick"><input :value="form.chromePath ?? ''" class="input" :class="{ code: !!form.chromePath }" readonly :placeholder="app.status?.chrome?.path ?? 'Detected Chrome'" @click="pickChrome" /><Btn icon="chrome" @click="pickChrome">Choose…</Btn><Btn v-if="form.chromePath" variant="subtle" @click="form.chromePath = null">Reset</Btn></div>
         </Field>
       </div>
     </section>

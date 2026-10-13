@@ -34,7 +34,7 @@ const platformsOf = (p: Post) => [...new Set(p.accountIds.map(id => props.brand.
 const liveUrl = (p: Post) => p.results.find(r => r.url)?.url ?? null;
 const openLive = (p: Post) => { const u = liveUrl(p); if (u) api('app.openExternal', { url: u }).catch(e => fail(e)); };
 const cols = [
-  { key: 'caption', label: 'Post' },
+  { key: 'caption', label: 'Post', width: '100%', class: 'cap-col' },
   { key: 'platforms', label: 'Where' },
   { key: 'scheduledAt', label: 'When', sortable: true },
   { key: 'status', label: 'Status', align: 'right' as const }
@@ -77,6 +77,8 @@ const go = (p: Post) => router.push(`/compose?post=${p.id}`);
 .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .posts-tab { container-type: inline-size; }
 /* the caption gives way first so the table never scrolls sideways */
-.cap { max-width: min(420px, 30cqw); min-width: 0; }
+/* the caption column takes the slack and truncates at its own edge; the others size to their content */
+.posts-tab :deep(td.cap-col) { max-width: 0; }
+.cap { min-width: 0; }
 .inl { display: inline; vertical-align: -1px; }
 </style>

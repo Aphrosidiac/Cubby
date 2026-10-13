@@ -9,6 +9,7 @@ import { useSection } from './useSection';
 import { api, isMac } from '@/lib/api';
 import { app } from '@/lib/store';
 import { fail } from '@/composables/toast';
+import { hourText } from '@/components/common/text';
 
 /** Start-up, tray, the quick-switch hotkey, time zone and the daily login check. */
 const { form, dirty, busy, save, discard } = useSection(['launchAtLogin', 'closeToTray', 'quickSwitchHotkey', 'timezone', 'healthCheckHour']);
@@ -18,7 +19,7 @@ const zones = computed(() => {
   if (form.timezone && !list.includes(form.timezone)) list = [form.timezone, ...list];
   return list.map(z => ({ value: z, label: z.replace(/_/g, ' '), group: z.split('/')[0] }));
 });
-const hours = Array.from({ length: 24 }, (_, h) => ({ value: h, label: `${String(h).padStart(2, '0')}:00` }));
+const hours = Array.from({ length: 24 }, (_, h) => ({ value: h, label: `Every day at ${hourText(h)}` }));
 const reveal = () => app.status && api('app.revealPath', { path: app.status.dataDir }).catch(e => fail(e));
 </script>
 
@@ -42,7 +43,7 @@ const reveal = () => app.status && api('app.revealPath', { path: app.status.data
     </div>
     <div class="set-row">
       <div class="set-l"><span class="t">Daily login check</span><span class="d">Closed brands get their login health read once a day at this hour (open ones are checked live).</span></div>
-      <div class="set-c"><Select v-model="form.healthCheckHour" :options="hours" aria-label="Hour" :min-width="140" style="max-width: 160px" /></div>
+      <div class="set-c"><Select v-model="form.healthCheckHour" :options="hours" aria-label="Hour" :min-width="200" style="max-width: 220px" /></div>
     </div>
     <div class="set-row">
       <div class="set-l"><span class="t">Data folder</span><span class="d">Database, brand profiles, screenshots and exports.</span></div>
